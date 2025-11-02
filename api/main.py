@@ -3,10 +3,13 @@ Aplicação FastAPI para Previsão de Preços B3SA3.SA
 
 Esta API serve o modelo LSTM treinado para fazer previsões de preços
 de ações da B3 S.A. (B3SA3.SA).
+
+Fase 8: Inclui sistema de monitoramento de produção com logging estruturado.
 """
 
 import os
 import sys
+import time
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Dict, Any
@@ -27,6 +30,9 @@ from api.schemas import (
     HealthResponse,
     InfoModeloResponse
 )
+
+# Sistema de monitoramento (Fase 8)
+from api.monitoring import get_prediction_logger, get_metrics_logger
 
 
 # Variáveis globais para armazenar modelo e scaler
@@ -187,6 +193,8 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
     Recebe uma lista de 60 preços de fechamento consecutivos e retorna
     a previsão do próximo preço.
     
+    FASE 8: Inclui logging detalhado para monitoramento em produção.
+    
     Args:
         previsao_input: Objeto contendo lista de 60 preços
         
@@ -196,8 +204,19 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
     Raises:
         HTTPException: Se o modelo não estiver carregado ou ocorrer erro na previsão
     """
+    # Inicializa loggers
+    pred_logger = get_prediction_logger()
+    metrics_logger = get_metrics_logger()
+    
+    # Incrementa contador de requisições
+    metrics_logger.increment_request()
+    
+    # Marca início do processamento
+    start_time = time.time()
+    
     # Validar se modelo e scaler estão carregados
     if model is None or scaler is None:
+        metrics_logger.increment_error()
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Modelo não está carregado. Aguarde a inicialização da API."
@@ -209,6 +228,7 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
         
         # Verificar número de preços (validação adicional)
         if len(dados) != WINDOW_SIZE:
+            metrics_logger.increment_error()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"É necessário fornecer exatamente {WINDOW_SIZE} preços. Recebidos: {len(dados)}"
@@ -238,11 +258,24 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
         # Extrair valor escalar
         valor_previsto = float(predicao_real[0, 0])
         
+        # Calcula tempo de processamento
+        processing_time = (time.time() - start_time) * 1000  # em ms
+        
+        # FASE 8: Log estruturado da previsão
+        # Converte dados para formato adequado (shape 60x5 -> lista de listas)
+        input_for_log = dados_lstm[0].tolist()  # Shape: (60, 5)
+        
+        request_id = pred_logger.log_prediction(
+            input_data=input_for_log,
+            prediction=valor_previsto,
+            processing_time_ms=processing_time
+        )
+        
         # Retornar resposta
         return PrevisaoOutput(
             preco_previsto=round(valor_previsto, 2),
             confianca="alta",
-            mensagem=f"Previsão gerada com sucesso. Modelo com MAPE de 1.53% no teste."
+            mensagem=f"Previsão gerada com sucesso. Modelo com MAPE de 1.53% no teste. [ID: {request_id}]"
         )
         
     except HTTPException:
@@ -251,6 +284,14 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
         
     except Exception as e:
         # Capturar qualquer outro erro
+        metrics_logger.increment_error()
+        
+        # Log do erro
+        pred_logger.log_error(
+            error_message=str(e),
+            input_data=previsao_input.prices if hasattr(previsao_input, 'prices') else None
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao processar previsão: {str(e)}"

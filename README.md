@@ -104,12 +104,15 @@ PredictFinance/
 - **Saída**: API acessível publicamente em `https://b3sa3-api.onrender.com`
 - 📖 **[Ver Guia Detalhado](docs/FASE_7_GUIA.md)**
 
-### **Fase 8: Monitoramento e Documentação Final**
-- Implementação de logs e métricas de monitoramento
-- Criação de dashboard para acompanhamento
-- Documentação completa do projeto
-- Vídeo explicativo demonstrando o funcionamento
-- **Saída**: Sistema completo documentado e operacional
+### **Fase 8: Monitoramento do Modelo em Produção** ✅
+- Logging estruturado de todas as requisições (estatísticas + latência)
+- Monitoramento de performance (validação de previsões vs valores reais)
+- Detecção de drift de dados (testes estatísticos + Evidently AI)
+- Sistema de alertas automáticos (thresholds configuráveis)
+- Monitoramento de uptime (health check + UptimeRobot)
+- Script de monitoramento diário automatizado
+- **Saída**: Sistema completo de observabilidade em produção 24/7
+- 📖 **[Ver Guia Detalhado](docs/FASE_8_GUIA.md)**
 
 ---
 
@@ -143,6 +146,12 @@ PredictFinance/
 - `uvicorn` - Servidor ASGI
 - `pydantic` - Validação de dados
 - `python-dotenv` - Gerenciamento de variáveis de ambiente
+
+#### Monitoramento (Fase 8)
+- `evidently` - Drift detection e model monitoring
+- `scipy` - Testes estatísticos (Kolmogorov-Smirnov)
+- `requests` - Alertas via Slack webhooks
+- `yfinance` - Coleta de valores reais para validação
 
 #### Testes e Qualidade
 - `pytest` - Testes unitários

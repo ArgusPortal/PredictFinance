@@ -1,0 +1,15 @@
+# Dependências para Monitoramento de Modelo em Produção (Fase 8)
+# Instale com: pip install -r requirements-monitoring.txt
+
+# Monitoramento e Drift Detection
+evidently==0.4.38
+scipy==1.11.4
+
+# Alertas e Notificações
+requests==2.31.0
+
+# Coleta de Dados em Produção
+yfinance==0.2.36
+
+# Logging Estruturado (opcional, já vem com Python)
+# python-json-logger==2.0.7  # Para logs JSON estruturados
