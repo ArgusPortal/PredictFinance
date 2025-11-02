@@ -1,0 +1,32 @@
+{
+    "timestamp": "2025-11-02T16:00:43.079188",
+    "ticker": "B3SA3.SA",
+    "periodo": {
+        "inicio": "2020-11-03",
+        "fim": "2025-10-31",
+        "dias_totais": 1246
+    },
+    "estatisticas_limpeza": {
+        "duplicatas_removidas": 0,
+        "missing_tratados": 0,
+        "inconsistencias": 0,
+        "outliers_detectados": 1,
+        "valores_negativos": 1,
+        "registros_finais": 1246
+    },
+    "estatisticas_dados": {
+        "preco_medio": 12.301578473509029,
+        "preco_minimo": 8.945140838623047,
+        "preco_maximo": 17.862741470336914,
+        "preco_atual": 12.65999984741211,
+        "volume_medio": 42180095.26484751
+    },
+    "colunas": [
+        "Close",
+        "High",
+        "Low",
+        "Open",
+        "Volume"
+    ],
+    "output_file": "data/raw\\b3sa3_historical.csv"
+}

@@ -1,0 +1,67 @@
+# Arquivos de ambiente
+.env
+venv/
+env/
+ENV/
+.venv
+
+# Dados
+data/raw/*.csv
+data/processed/*.npy
+data/processed/*.pkl
+
+# Modelos treinados
+models/*.h5
+models/*.keras
+models/*/
+models/*.pkl
+models/*.joblib
+
+# Logs e cache
+logs/
+*.log
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Documentação gerada
+docs/data_collection/*.png
+docs/evaluation/*.png
+docs/training/*.png
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build e distribuição
+build/
+dist/
+*.egg-info/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Temporários
+*.tmp
+*.bak
+*.swp

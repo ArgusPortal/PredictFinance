@@ -1,0 +1,59 @@
+# ============================================
+# PredictFinance - Dependências do Projeto
+# Modelo LSTM para Previsão de Ações B3SA3.SA
+# ============================================
+
+# Core - Python 3.10+
+# --------------------
+
+# Coleta e Manipulação de Dados
+yfinance>=0.2.32
+pandas>=1.5.3,<2.1.0
+numpy>=1.23.5,<1.25.0
+
+# Machine Learning e Deep Learning
+tensorflow>=2.10.0,<2.16.0
+scikit-learn>=1.2.2,<1.4.0
+keras>=2.10.0,<2.16.0
+
+# Visualização
+matplotlib>=3.7.0,<3.9.0
+seaborn>=0.12.2
+plotly>=5.14.0
+
+# Persistência de Modelos
+joblib>=1.2.0
+
+# API e Web Framework
+fastapi>=0.100.0,<0.110.0
+uvicorn[standard]>=0.23.0,<0.28.0
+pydantic>=2.0.0,<2.6.0
+python-multipart>=0.0.6
+
+# Configuração e Ambiente
+python-dotenv>=1.0.0
+
+# Utilitários
+tqdm>=4.65.0
+requests>=2.31.0
+
+# Testes
+pytest>=7.4.0
+pytest-cov>=4.1.0
+httpx>=0.24.0  # Para testar FastAPI
+
+# Qualidade de Código
+black>=23.3.0
+flake8>=6.0.0
+isort>=5.12.0
+
+# Logging e Monitoramento
+loguru>=0.7.2
+
+# Deploy
+gunicorn>=21.2.0  # Para produção
+
+# Jupyter (Opcional - para notebooks)
+jupyter>=1.0.0
+ipykernel>=6.25.0
+notebook>=6.5.4,<7.1.0
