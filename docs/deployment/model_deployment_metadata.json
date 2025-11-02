@@ -1,0 +1,194 @@
+{
+    "timestamp": "2025-11-02T16:31:21.188775",
+    "fase": "Fase 5 - Persistência e Verificação",
+    "status": "concluida",
+    "artefatos": {
+        "modelo": {
+            "arquivo": "lstm_model_best.h5",
+            "caminho": "models\\lstm_model_best.h5",
+            "existe": true,
+            "tamanho_mb": 0.39,
+            "modificado": "2025-11-02T16:26:44.149865",
+            "formato": "HDF5"
+        },
+        "scaler": {
+            "arquivo": "scaler.pkl",
+            "caminho": "models\\scaler.pkl",
+            "existe": true,
+            "tamanho_kb": 0.86,
+            "modificado": "2025-11-02T16:12:45.896060",
+            "formato": "PKL (joblib)"
+        },
+        "arquitetura": {
+            "arquivo": "model_architecture.json",
+            "caminho": "models\\model_architecture.json",
+            "existe": true,
+            "tamanho_kb": 3.41,
+            "formato": "JSON"
+        }
+    },
+    "modelo": {
+        "nome": "LSTM_B3SA3_Predictor",
+        "input_shape": [
+            null,
+            60,
+            5
+        ],
+        "output_shape": [
+            null,
+            1
+        ],
+        "num_parametros": 30369,
+        "num_camadas": 4,
+        "camadas": [
+            {
+                "index": 0,
+                "nome": "lstm_layer_1",
+                "tipo": "LSTM",
+                "output_shape": [
+                    60,
+                    64
+                ]
+            },
+            {
+                "index": 1,
+                "nome": "dropout_layer",
+                "tipo": "Dropout",
+                "output_shape": [
+                    60,
+                    64
+                ]
+            },
+            {
+                "index": 2,
+                "nome": "lstm_layer_2",
+                "tipo": "LSTM",
+                "output_shape": [
+                    32
+                ]
+            },
+            {
+                "index": 3,
+                "nome": "output_layer",
+                "tipo": "Dense",
+                "output_shape": [
+                    1
+                ]
+            }
+        ]
+    },
+    "scaler": {
+        "tipo": "MinMaxScaler",
+        "feature_range": [
+            0,
+            1
+        ],
+        "num_features": 5,
+        "data_min": [
+            8.994021037834955,
+            9.13088691384083,
+            8.788722689987393,
+            8.945140838623047,
+            0.0
+        ],
+        "data_max": [
+            17.752946128875838,
+            18.04573150731227,
+            17.59529225991048,
+            17.862741470336914,
+            276369600.0
+        ],
+        "data_range": [
+            8.758925091040883,
+            8.914844593471438,
+            8.806569569923086,
+            8.917600631713867,
+            276369600.0
+        ]
+    },
+    "api_metadata": {
+        "versao": "1.0.0",
+        "timestamp": "2025-11-02T16:31:21.188775",
+        "modelo": {
+            "arquivo": "lstm_model_best.h5",
+            "formato": "HDF5",
+            "input_shape": [
+                null,
+                60,
+                5
+            ],
+            "output_shape": [
+                null,
+                1
+            ],
+            "timesteps": 60,
+            "features": 5,
+            "features_nomes": [
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "Volume"
+            ]
+        },
+        "scaler": {
+            "arquivo": "scaler.pkl",
+            "tipo": "MinMaxScaler",
+            "feature_range": [
+                0,
+                1
+            ],
+            "num_features": 5
+        },
+        "requisitos_input": {
+            "formato": "JSON",
+            "estrutura": {
+                "dias_historicos": 60,
+                "features_por_dia": 5,
+                "ordem_features": [
+                    "Open",
+                    "High",
+                    "Low",
+                    "Close",
+                    "Volume"
+                ]
+            },
+            "exemplo": {
+                "descricao": "Array de 60 dias, cada dia com 5 valores",
+                "shape": "(60, 5)"
+            }
+        },
+        "output": {
+            "formato": "JSON",
+            "descricao": "Preço de fechamento previsto para o próximo dia",
+            "tipo": "float",
+            "unidade": "R$"
+        }
+    },
+    "validacao": {
+        "teste_carregamento_modelo": "sucesso",
+        "teste_carregamento_scaler": "sucesso",
+        "teste_predicao": {
+            "input_shape": [
+                1,
+                60,
+                5
+            ],
+            "predicao_normalizada": 0.42035260796546936,
+            "predicao_final": 12.693677520958488,
+            "validacao": true,
+            "status": "sucesso"
+        }
+    },
+    "instrucoes_uso": {
+        "carregar_modelo": "model = keras.models.load_model('models/lstm_model_best.h5')",
+        "carregar_scaler": "scaler = joblib.load('models/scaler.pkl')",
+        "fazer_predicao": [
+            "1. Preparar dados: 60 dias × 5 features (OHLCV)",
+            "2. Normalizar com scaler: scaler.transform(dados)",
+            "3. Reshape: dados.reshape(1, 60, 5)",
+            "4. Prever: model.predict(dados)",
+            "5. Desnormalizar resultado com scaler.inverse_transform()"
+        ]
+    }
+}

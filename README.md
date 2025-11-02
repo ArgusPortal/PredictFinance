@@ -49,35 +49,42 @@ PredictFinance/
 
 ## 📊 Fases do Projeto
 
-### **Fase 1: Coleta e Limpeza de Dados**
+### **Fase 1: Coleta e Limpeza de Dados** ✅
 - Obtenção de dados históricos da B3SA3.SA via Yahoo Finance (yfinance)
 - Tratamento de valores ausentes, outliers e inconsistências
 - Análise exploratória inicial dos dados
 - **Saída**: Dados limpos salvos em `data/raw/`
+- 📖 **[Ver Guia Detalhado](docs/FASE_1_GUIA.md)**
 
-### **Fase 2: Preparação dos Dados para LSTM**
+### **Fase 2: Preparação dos Dados para LSTM** ✅
 - Normalização dos dados usando MinMaxScaler
 - Criação de sequências temporais (janelas deslizantes)
 - Divisão em conjuntos de treino, validação e teste
 - **Saída**: Dados preparados em `data/processed/` e scaler salvo
+- 📖 **[Ver Guia Detalhado](docs/FASE_2_GUIA.md)**
 
-### **Fase 3: Construção e Treinamento do Modelo LSTM**
+### **Fase 3: Construção da Arquitetura LSTM** ✅
 - Definição da arquitetura da rede neural LSTM
 - Configuração de hiperparâmetros (camadas, neurônios, dropout)
+- Compilação com otimizador Adam e função de perda MSE
+- **Saída**: Arquitetura do modelo documentada em `models/` e `docs/`
+- 📖 **[Ver Guia Detalhado](docs/FASE_3_GUIA.md)**
+
+### **Fase 4: Treinamento e Avaliação do Modelo** ✅
 - Treinamento com early stopping e callbacks
-- **Saída**: Modelo treinado salvo em `models/`
-
-### **Fase 4: Avaliação de Desempenho**
-- Cálculo de métricas: RMSE, MAE, MAPE
+- Cálculo de métricas: RMSE, MAE, MAPE, R²
 - Geração de gráficos comparativos (real vs. previsto)
-- Análise de resíduos e validação do modelo
-- **Saída**: Relatório de avaliação em `docs/`
+- Análise de curvas de aprendizado
+- **Saída**: Modelo treinado salvo em `models/`, métricas em `docs/training/`
+- 📖 **[Ver Guia Detalhado](docs/FASE_4_GUIA.md)**
 
-### **Fase 5: Salvamento de Modelo e Scaler**
-- Persistência do modelo treinado (.h5 ou SavedModel)
-- Salvamento do scaler para normalização/desnormalização
-- Versionamento dos artefatos
-- **Saída**: Artefatos prontos para produção
+### **Fase 5: Persistência e Verificação do Modelo** ✅
+- Verificação de artefatos (modelo .h5 e scaler .pkl)
+- Testes de carregamento e predição
+- Geração de metadados para API
+- Documentação completa de deployment
+- **Saída**: Artefatos validados e metadados em `docs/deployment/`
+- 📖 **[Ver Guia Detalhado](docs/FASE_5_GUIA.md)**
 
 ### **Fase 6: Desenvolvimento da API com FastAPI**
 - Criação de endpoints REST para previsões
