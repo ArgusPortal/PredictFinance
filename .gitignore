@@ -10,12 +10,15 @@ data/raw/*.csv
 data/processed/*.npy
 data/processed/*.pkl
 
-# Modelos treinados
-models/*.h5
-models/*.keras
-models/*/
-models/*.pkl
-models/*.joblib
+# Modelos treinados (comentado para permitir deploy)
+# IMPORTANTE: Descomentar após deploy se não quiser versionar modelos grandes
+# models/*.h5
+# models/*.keras
+# models/*/
+# models/*.pkl
+# models/*.joblib
+
+# Por enquanto, os modelos são versionados para o deploy
 
 # Logs e cache
 logs/

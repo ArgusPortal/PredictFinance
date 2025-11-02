@@ -86,17 +86,23 @@ PredictFinance/
 - **Saída**: Artefatos validados e metadados em `docs/deployment/`
 - 📖 **[Ver Guia Detalhado](docs/FASE_5_GUIA.md)**
 
-### **Fase 6: Desenvolvimento da API com FastAPI**
-- Criação de endpoints REST para previsões
-- Endpoint de health check e informações do modelo
+### **Fase 6: Desenvolvimento da API com FastAPI** ✅
+- Criação de aplicação FastAPI com endpoints REST
+- Endpoint POST /predict para fazer previsões
+- Endpoints auxiliares: /, /health, /info, /metrics
+- Validação de dados com Pydantic
 - Documentação automática com Swagger/OpenAPI
-- **Saída**: API funcional localmente
+- **Saída**: API funcional localmente com 5 endpoints, testes completos
+- 📖 **[Ver Guia Detalhado](docs/FASE_6_GUIA.md)**
 
-### **Fase 7: Deploy da API**
-- Containerização com Docker
-- Deploy em serviço gratuito (Render, Railway, ou similar)
-- Configuração de variáveis de ambiente
-- **Saída**: API em produção com endpoint público
+### **Fase 7: Deploy da API** ✅
+- Preparação de dependências otimizadas (tensorflow-cpu)
+- Configuração render.yaml e Procfile
+- Deploy no Render.com (Free Tier)
+- Obtenção de URL pública HTTPS
+- Testes completos em produção
+- **Saída**: API acessível publicamente em `https://b3sa3-api.onrender.com`
+- 📖 **[Ver Guia Detalhado](docs/FASE_7_GUIA.md)**
 
 ### **Fase 8: Monitoramento e Documentação Final**
 - Implementação de logs e métricas de monitoramento
