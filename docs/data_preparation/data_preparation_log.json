@@ -1,0 +1,70 @@
+{
+    "timestamp": "2025-11-02T16:12:45.896059",
+    "parametros": {
+        "timesteps": 60,
+        "features": [
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume"
+        ],
+        "target": "Close",
+        "train_split": 0.7,
+        "val_split": 0.15,
+        "test_split": 0.15
+    },
+    "dados": {
+        "total_sequencias": 1186,
+        "treino": {
+            "X_shape": [
+                830,
+                60,
+                5
+            ],
+            "y_shape": [
+                830
+            ],
+            "samples": 830
+        },
+        "validacao": {
+            "X_shape": [
+                177,
+                60,
+                5
+            ],
+            "y_shape": [
+                177
+            ],
+            "samples": 177
+        },
+        "teste": {
+            "X_shape": [
+                179,
+                60,
+                5
+            ],
+            "y_shape": [
+                179
+            ],
+            "samples": 179
+        }
+    },
+    "normalizacao": {
+        "metodo": "MinMaxScaler",
+        "range": [
+            0,
+            1
+        ],
+        "scaler_path": "models\\scaler.pkl"
+    },
+    "arquivos_gerados": [
+        "data/processed\\X_train.npy",
+        "data/processed\\y_train.npy",
+        "data/processed\\X_val.npy",
+        "data/processed\\y_val.npy",
+        "data/processed\\X_test.npy",
+        "data/processed\\y_test.npy",
+        "models\\scaler.pkl"
+    ]
+}

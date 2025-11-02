@@ -1,0 +1,64 @@
+{
+    "timestamp": "2025-11-02T16:22:26.907170",
+    "model_name": "LSTM_B3SA3_Predictor",
+    "architecture": {
+        "layers": [
+            {
+                "name": "lstm_layer_1",
+                "type": "LSTM",
+                "output_shape": [
+                    60,
+                    64
+                ],
+                "params": 17920,
+                "units": 64,
+                "return_sequences": true
+            },
+            {
+                "name": "dropout_layer",
+                "type": "Dropout",
+                "output_shape": [
+                    60,
+                    64
+                ],
+                "params": 0,
+                "rate": 0.2
+            },
+            {
+                "name": "lstm_layer_2",
+                "type": "LSTM",
+                "output_shape": [
+                    32
+                ],
+                "params": 12416,
+                "units": 32,
+                "return_sequences": false
+            },
+            {
+                "name": "output_layer",
+                "type": "Dense",
+                "output_shape": [
+                    1
+                ],
+                "params": 33,
+                "units": 1,
+                "activation": "linear"
+            }
+        ],
+        "total_params": 30369,
+        "trainable_params": 30369,
+        "non_trainable_params": 0
+    },
+    "compilation": {
+        "optimizer": "Adam",
+        "loss": "mse",
+        "metrics": []
+    },
+    "input_shape": [
+        60,
+        5
+    ],
+    "output_shape": [
+        1
+    ]
+}
