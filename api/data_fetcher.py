@@ -7,6 +7,7 @@ para uso nos endpoints de previsão automática.
 
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+import time
 
 import numpy as np
 import pandas as pd
@@ -41,14 +42,35 @@ def buscar_dados_historicos(
         data_fim = datetime.now()
         data_inicio = data_fim - timedelta(days=dias * 2)
         
-        # Download dos dados
-        ticker_obj = yf.Ticker(ticker)
-        df = ticker_obj.history(
-            start=data_inicio,
-            end=data_fim,
-            interval='1d',
-            auto_adjust=False  # Manter dados originais sem ajustes
-        )
+        # Configurar sessão do yfinance com headers apropriados
+        # Isso ajuda a evitar bloqueios do Yahoo Finance
+        
+        # Download dos dados com retry
+        max_tentativas = 3
+        tentativa = 0
+        df = pd.DataFrame()
+        
+        while tentativa < max_tentativas and df.empty:
+            try:
+                ticker_obj = yf.Ticker(ticker)
+                df = ticker_obj.history(
+                    start=data_inicio,
+                    end=data_fim,
+                    interval='1d',
+                    auto_adjust=False,  # Manter dados originais sem ajustes
+                    timeout=30  # Aumentar timeout para 30 segundos
+                )
+                
+                if not df.empty:
+                    break
+                    
+            except Exception as e:
+                tentativa += 1
+                if tentativa < max_tentativas:
+                    # Aguardar antes de tentar novamente (backoff exponencial)
+                    time.sleep(2 ** tentativa)
+                else:
+                    raise Exception(f"Falha após {max_tentativas} tentativas: {str(e)}")
         
         # Validações
         if df.empty:
