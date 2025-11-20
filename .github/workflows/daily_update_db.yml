@@ -1,0 +1,92 @@
+name: Daily Database Update
+
+# Executa todos os dias às 4h UTC (após fechamento do mercado brasileiro)
+# Também pode ser executado manualmente via workflow_dispatch
+on:
+  schedule:
+    # Cron: minuto hora dia-do-mes mes dia-da-semana
+    # 0 4 * * * = todos os dias às 4:00 UTC (1:00 BRT)
+    - cron: '0 4 * * *'
+  
+  workflow_dispatch:  # Permite execução manual
+    inputs:
+      ticker:
+        description: 'Ticker para atualizar (ex: B3SA3.SA)'
+        required: false
+        default: 'B3SA3.SA'
+
+jobs:
+  update-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configurar Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install yfinance pandas
+    
+    - name: Verificar se banco de dados existe
+      run: |
+        if [ ! -f "database/market_data.db" ]; then
+          echo "⚠️  Banco de dados não existe - será criado"
+          echo "DB_EXISTS=false" >> $GITHUB_ENV
+        else
+          echo "✅ Banco de dados encontrado"
+          echo "DB_EXISTS=true" >> $GITHUB_ENV
+        fi
+    
+    - name: Criar banco de dados inicial (se necessário)
+      if: env.DB_EXISTS == 'false'
+      run: |
+        echo "📥 Criando banco de dados com 5 anos de histórico..."
+        python database/populate_db.py --ticker B3SA3.SA --years 5
+    
+    - name: Atualizar banco de dados
+      run: |
+        TICKER="${{ github.event.inputs.ticker || 'B3SA3.SA' }}"
+        echo "🔄 Atualizando dados de $TICKER..."
+        python database/update_db.py --ticker $TICKER
+    
+    - name: Verificar mudanças
+      id: check_changes
+      run: |
+        if git diff --quiet database/market_data.db; then
+          echo "Nenhuma mudança no banco de dados"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "Banco de dados foi atualizado"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Commit e push das mudanças
+      if: steps.check_changes.outputs.has_changes == 'true'
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add database/market_data.db
+        git commit -m "chore: atualização diária do banco de dados [skip ci]"
+        git push
+    
+    - name: Notificar sucesso
+      if: success()
+      run: |
+        echo "✅ Atualização do banco de dados concluída com sucesso!"
+        echo "📅 Data: $(date)"
+    
+    - name: Notificar falha
+      if: failure()
+      run: |
+        echo "❌ Falha na atualização do banco de dados"
+        echo "📅 Data: $(date)"
+        exit 1

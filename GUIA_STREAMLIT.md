@@ -40,7 +40,10 @@ O Streamlit abrirá automaticamente em: `http://localhost:8501`
 
 ### 📊 Análise Descritiva
 **Funcionalidades:**
-- Busca de dados históricos via Yahoo Finance
+- Busca de dados históricos com fallback automático:
+  - 🏆 **Cache SQLite** (via API `/data/historical`) - Preferencial, <10ms
+  - 🌐 **Yahoo Finance** (direto) - Se API falhar
+  - 📦 **Dados Hardcoded** (60 dias) - Último recurso
 - Estatísticas descritivas completas (média, mediana, desvio padrão, etc.)
 - Gráficos interativos:
   - 📈 Candlestick com médias móveis (MA20, MA50)
@@ -54,7 +57,8 @@ O Streamlit abrirá automaticamente em: `http://localhost:8501`
 1. Digite o ticker (ex: B3SA3.SA, PETR4.SA)
 2. Selecione o período (1 mês a 5 anos)
 3. Clique em "Buscar Dados"
-4. Explore as abas com diferentes visualizações
+4. Veja o indicador de origem dos dados (📊 SQLite ou 📡 Yahoo)
+5. Explore as abas com diferentes visualizações
 
 ### 🎯 Métricas do Modelo
 **Funcionalidades organizadas em 4 abas:**
@@ -321,22 +325,54 @@ streamlit cache clear
 
 ## 🚀 Deploy em Produção
 
-### Render.com
-1. Adicione `streamlit` aos `requirements-render.txt` ✅ (já feito)
-2. Configure start command:
-   ```bash
-   streamlit run app_streamlit.py --server.port=$PORT --server.address=0.0.0.0
-   ```
-3. Configure variável de ambiente:
-   ```
-   API_BASE_URL=https://sua-api.onrender.com
-   ```
+### Arquitetura Recomendada
 
-### Streamlit Cloud
-1. Faça push do código para GitHub
-2. Acesse https://share.streamlit.io/
-3. Conecte o repositório
-4. Deploy automático!
+```
+Streamlit Cloud (Frontend) ← → Render.com (API Backend)
+app_streamlit.py                FastAPI + LSTM + SQLite
+```
+
+### Opção 1: Streamlit Cloud (Recomendado)
+
+1. **Deploy API no Render** (se ainda não fez)
+   - Siga: [DEPLOY_QUICKSTART.md](DEPLOY_QUICKSTART.md)
+   - URL resultante: `https://b3sa3-api.onrender.com`
+
+2. **Deploy Frontend no Streamlit Cloud**
+   - Acesse: https://share.streamlit.io/
+   - Conecte repositório GitHub
+   - Arquivo principal: `app_streamlit.py`
+   - Configure secrets (Settings → Secrets):
+     ```toml
+     API_BASE_URL = "https://b3sa3-api.onrender.com"
+     GEMINI_API_KEY = "sua-chave-gemini"
+     ```
+   - Deploy automático!
+
+📖 **Guia completo**: [docs/DEPLOY_STREAMLIT.md](docs/DEPLOY_STREAMLIT.md)
+
+### Opção 2: Render.com (Frontend + API no mesmo serviço)
+
+⚠️ **Não recomendado** - Conflito de portas e healthcheck
+
+---
+
+## 💾 Sistema de Cache SQLite
+
+A aplicação agora usa cache SQLite com fallback automático:
+
+**Fluxo de busca de dados:**
+1. 🏆 **Cache SQLite** via `/data/historical` (< 10ms, preferencial)
+2. 🌐 **Yahoo Finance** direto (2-30s, se API falhar)
+3. 📦 **Dados Hardcoded** (60 dias, último recurso)
+
+**Vantagens:**
+- ⚡ Performance 200x mais rápida
+- 🛡️ Funciona mesmo com Yahoo bloqueado
+- 📊 Histórico completo: 6 anos (2020-2025)
+- 🔄 Atualização automática diária (4h UTC)
+
+📖 **Documentação completa**: [docs/DATABASE_GUIDE.md](docs/DATABASE_GUIDE.md)
 
 ---
 
@@ -344,7 +380,9 @@ streamlit cache clear
 
 - [Documentação Streamlit](https://docs.streamlit.io/)
 - [Plotly Documentation](https://plotly.com/python/)
-- [yfinance Documentation](https://github.com/ranaroussi/yfinance)
+- [Sistema de Cache SQLite](docs/DATABASE_GUIDE.md)
+- [Deploy API Render](DEPLOY_QUICKSTART.md)
+- [Deploy Streamlit Cloud](docs/DEPLOY_STREAMLIT.md)
 
 ---
 

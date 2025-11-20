@@ -6,9 +6,12 @@ Este projeto desenvolve um modelo preditivo de preços das ações da B3 S.A. (c
 
 O projeto contempla desde a coleta e preparação de dados históricos até o deploy de uma API REST para disponibilizar previsões em tempo real, incluindo monitoramento contínuo do modelo em produção.
 
-**✨ Novidade:** API com **busca automática de dados**! Basta fornecer o ticker (ex: `B3SA3.SA`) e a API busca automaticamente os últimos 60 dias de dados OHLCV do Yahoo Finance para gerar a previsão.
-
-**🎨 Novo:** Interface **Streamlit** com dashboards interativos, análise descritiva, métricas do modelo e análise técnica avançada!
+**✨ Novidades v2.0:**
+- 💾 **Cache SQLite**: 6 anos de histórico (2020-2025) com fallback automático
+- 🚀 **API FastAPI**: Busca automática de dados com sistema de 3 níveis (Yahoo → SQLite → Hardcoded)
+- 🎨 **Interface Streamlit**: Dashboards interativos com análise descritiva e técnica
+- 🔄 **Atualização Automática**: GitHub Actions atualiza banco diariamente às 4h UTC
+- 📊 **Novo Endpoint**: `/data/historical` para consultas customizadas de período
 
 ---
 
@@ -44,9 +47,17 @@ Acesse: `http://localhost:8501`
 #### Previsão Automática
 
 ```bash
+# Previsão com fallback automático (Yahoo → SQLite → Hardcoded)
 curl -X POST https://b3sa3-api.onrender.com/predict/auto \
   -H "Content-Type: application/json" \
   -d '{"ticker": "B3SA3.SA"}'
+```
+
+#### Dados Históricos do Cache SQLite
+
+```bash
+# Buscar dados de um período específico
+curl "https://b3sa3-api.onrender.com/data/historical/B3SA3.SA?start_date=2024-01-01&end_date=2024-12-31"
 ```
 
 **Resposta:**
@@ -80,6 +91,11 @@ PredictFinance/
 ├── data/
 │   ├── raw/              # Dados brutos coletados
 │   └── processed/        # Dados processados e normalizados
+├── database/             # Sistema de cache SQLite
+│   ├── db_manager.py     # Gerenciador do banco
+│   ├── populate_db.py    # Script de população inicial
+│   ├── update_db.py      # Atualização diária
+│   └── market_data.db    # Banco SQLite (~284 KB, 6 anos)
 ├── models/               # Modelos treinados e scalers salvos
 ├── src/                  # Código-fonte do projeto
 │   ├── data_collection.py
@@ -88,9 +104,14 @@ PredictFinance/
 │   ├── model_evaluation.py
 │   └── utils.py
 ├── api/                  # Código da API FastAPI
-│   ├── main.py
+│   ├── main.py            # Endpoints (inclui /data/historical)
 │   ├── schemas.py
-│   └── predictor.py
+│   ├── data_fetcher.py    # Busca com fallback (Yahoo → SQLite)
+│   └── fallback_data.py   # Dados hardcoded (60 dias)
+├── app_streamlit.py      # Interface web
+├── .github/workflows/    # GitHub Actions
+│   ├── weekly_retrain.yml
+│   └── daily_update_db.yml # Atualiza banco diariamente
 ├── notebooks/            # Jupyter notebooks para análise exploratória
 ├── docs/                 # Documentação técnica
 ├── tests/                # Testes unitários
@@ -168,6 +189,30 @@ PredictFinance/
 - Script de monitoramento diário automatizado
 - **Saída**: Sistema completo de observabilidade em produção 24/7
 - 📖 **[Ver Guia Detalhado](docs/FASE_8_GUIA.md)**
+
+### **Fase 9: Interface Streamlit** ✅
+- Desenvolvimento de interface web interativa
+- Dashboards com métricas, gráficos e visualizações
+- Análise descritiva e técnica de ativos
+- Previsões em tempo real com relatórios IA
+- **Saída**: Aplicação Streamlit completa em `app_streamlit.py`
+- 📖 **[Ver Guia Detalhado](GUIA_STREAMLIT.md)**
+
+### **Fase 10: Sistema de Cache SQLite** ✅
+- Banco de dados SQLite com 6 anos de histórico (2020-2025)
+- Sistema de fallback em 3 níveis (Yahoo → SQLite → Hardcoded)
+- Endpoint `/data/historical` para consultas customizadas
+- Atualização automática diária via GitHub Actions (4h UTC)
+- Scripts de população e manutenção
+- **Saída**: Banco populado (1468 registros, 284 KB), workflows automatizados
+- 📖 **[Ver Guia Completo](docs/DATABASE_GUIDE.md)**
+
+### **Fase 11: Deploy Completo** 🔄
+- **API**: Render.com (FastAPI + LSTM + SQLite)
+- **Frontend**: Streamlit Cloud (Interface web)
+- Workflows GitHub Actions (retrain semanal + update DB diário)
+- Monitoramento e logs em produção
+- 📖 **[Deploy API](DEPLOY_QUICKSTART.md)** | **[Deploy Streamlit](docs/DEPLOY_STREAMLIT.md)**
 
 ---
 

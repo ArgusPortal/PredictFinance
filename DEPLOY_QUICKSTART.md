@@ -117,7 +117,10 @@ curl https://b3sa3-api.onrender.com/
 # Info do modelo
 curl https://b3sa3-api.onrender.com/info
 
-# Fazer previsão AUTOMÁTICA (recomendado - mais fácil!)
+# Buscar dados históricos do cache SQLite
+curl "https://b3sa3-api.onrender.com/data/historical/B3SA3.SA?start_date=2024-01-01&end_date=2024-12-31"
+
+# Fazer previsão AUTOMÁTICA (recomendado - usa fallback SQLite se Yahoo falhar!)
 curl -X POST https://b3sa3-api.onrender.com/predict/auto \
   -H "Content-Type: application/json" \
   -d '{"ticker": "B3SA3.SA"}'

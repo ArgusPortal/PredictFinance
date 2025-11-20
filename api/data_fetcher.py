@@ -15,7 +15,14 @@ import pandas as pd
 import yfinance as yf
 from fastapi import HTTPException, status
 
-# Importar dados de fallback
+# Importar database SQLite
+try:
+    from database.db_manager import get_db
+    DB_DISPONIVEL = True
+except ImportError:
+    DB_DISPONIVEL = False
+
+# Importar dados de fallback (último recurso)
 try:
     from api.fallback_data import get_dados_exemplo, usar_fallback_disponivel
     FALLBACK_DISPONIVEL = True
@@ -95,9 +102,31 @@ def buscar_dados_historicos(
         
         # Validações
         if df.empty:
-            # Tentar usar dados de fallback antes de falhar
+            logger.warning(f"⚠️ Yahoo Finance falhou completamente após {max_tentativas} tentativas")
+            
+            # ESTRATÉGIA DE FALLBACK:
+            # 1º: Tentar SQLite Database (preferido)
+            # 2º: Usar dados hardcoded (último recurso)
+            
+            # Fallback 1: SQLite Database
+            if DB_DISPONIVEL:
+                logger.info(f"🔄 Tentando buscar do banco SQLite...")
+                try:
+                    db = get_db()
+                    dados_db, df_db = db.get_data(ticker, dias=dias)
+                    
+                    if dados_db is not None:
+                        logger.info(f"✅ Dados recuperados do SQLite: {len(dados_db)} dias")
+                        return dados_db, df_db
+                    else:
+                        logger.warning(f"⚠️ SQLite não tem dados suficientes para {ticker}")
+                
+                except Exception as e:
+                    logger.error(f"❌ Erro ao buscar do SQLite: {e}")
+            
+            # Fallback 2: Dados hardcoded (último recurso)
             if FALLBACK_DISPONIVEL and ticker.upper() == "B3SA3.SA" and dias == 60:
-                logger.warning(f"Yahoo Finance falhou, usando dados de fallback para {ticker}")
+                logger.warning(f"🔄 Usando dados de fallback hardcoded para {ticker}")
                 try:
                     dados_fallback = get_dados_exemplo(ticker, dias)
                     # Criar DataFrame mock para retorno
@@ -105,17 +134,18 @@ def buscar_dados_historicos(
                         dados_fallback,
                         columns=['Open', 'High', 'Low', 'Close', 'Volume']
                     )
-                    logger.info(f"✅ Fallback: {len(df_fallback)} dias de dados")
+                    logger.info(f"✅ Fallback hardcoded: {len(df_fallback)} dias de dados")
                     return dados_fallback, df_fallback
                 except Exception as e:
-                    logger.error(f"Erro ao usar fallback: {e}")
+                    logger.error(f"❌ Erro ao usar fallback hardcoded: {e}")
             
-            # Se fallback também falhar ou não disponível
+            # Se tudo falhar
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Yahoo Finance temporariamente indisponível para '{ticker}'. "
-                       f"Tentativas: {max_tentativas}. Último erro: {ultimo_erro}. "
-                       f"Tente novamente em alguns minutos."
+                detail=f"Dados temporariamente indisponíveis para '{ticker}'. "
+                       f"Yahoo Finance bloqueado e fallbacks não disponíveis. "
+                       f"Tente novamente em alguns minutos ou popule o banco SQLite: "
+                       f"python database/populate_db.py --ticker {ticker}"
             )
         
         if len(df) < dias:

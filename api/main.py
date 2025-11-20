@@ -10,6 +10,8 @@ Fase 8: Inclui sistema de monitoramento de produção com logging estruturado.
 import os
 import sys
 import time
+import traceback
+from datetime import datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Dict, Any
@@ -43,6 +45,14 @@ from api.data_fetcher import (
     validar_ticker_format,
     obter_info_ticker
 )
+
+# Módulo de banco de dados SQLite (Fase 10)
+try:
+    from database import get_db
+    DB_DISPONIVEL = True
+except ImportError:
+    DB_DISPONIVEL = False
+    print("⚠️  Módulo database não encontrado - endpoints de dados históricos desabilitados")
 
 
 # Variáveis globais para armazenar modelo e scaler
@@ -218,6 +228,116 @@ async def info_modelo() -> InfoModeloResponse:
         window_size=60,
         features=["Open", "High", "Low", "Close", "Volume"]
     )
+
+
+@app.get(
+    "/data/historical/{ticker}",
+    summary="Dados Históricos do Banco de Dados",
+    description="Retorna dados históricos OHLCV do cache SQLite para um período específico",
+    tags=["Dados"],
+    status_code=status.HTTP_200_OK
+)
+async def obter_dados_historicos(
+    ticker: str,
+    start_date: str,  # YYYY-MM-DD
+    end_date: str     # YYYY-MM-DD
+) -> JSONResponse:
+    """
+    Retorna dados históricos do banco de dados SQLite.
+    
+    Este endpoint permite consultar qualquer período de dados históricos
+    armazenados no cache local, sem depender do Yahoo Finance.
+    
+    Args:
+        ticker: Símbolo da ação (ex: B3SA3.SA)
+        start_date: Data inicial no formato YYYY-MM-DD
+        end_date: Data final no formato YYYY-MM-DD
+        
+    Returns:
+        JSONResponse com:
+        - ticker: Símbolo consultado
+        - period: {"start": start_date, "end": end_date}
+        - count: Número de registros retornados
+        - data: Array de objetos com date, open, high, low, close, volume
+        
+    Raises:
+        HTTPException 503: Se banco de dados não estiver disponível
+        HTTPException 400: Se datas forem inválidas
+        HTTPException 404: Se não houver dados para o período
+    """
+    if not DB_DISPONIVEL:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Banco de dados SQLite não está disponível. Execute: python database/populate_db.py"
+        )
+    
+    # Valida formato das datas
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        if start_dt > end_dt:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date deve ser anterior a end_date"
+            )
+            
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato de data inválido. Use YYYY-MM-DD. Erro: {str(e)}"
+        )
+    
+    # Busca dados do banco
+    try:
+        db = get_db()
+        df = db.get_data_by_period(ticker, start_dt, end_dt)
+        
+        if df is None or df.empty:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Nenhum dado encontrado para {ticker} entre {start_date} e {end_date}. "
+                       f"Execute: python database/populate_db.py --ticker {ticker}"
+            )
+        
+        # Converte DataFrame para lista de dicionários
+        data = []
+        for idx, row in df.iterrows():
+            # idx pode ser string ou datetime, normalizar para string
+            if hasattr(idx, 'strftime'):
+                date_str = idx.strftime("%Y-%m-%d")
+            else:
+                date_str = str(idx)
+            
+            data.append({
+                "date": date_str,
+                "open": float(row['Open']),
+                "high": float(row['High']),
+                "low": float(row['Low']),
+                "close": float(row['Close']),
+                "volume": int(row['Volume'])
+            })
+        
+        return JSONResponse(
+            content={
+                "ticker": ticker,
+                "period": {
+                    "start": start_date,
+                    "end": end_date
+                },
+                "count": len(data),
+                "data": data
+            },
+            status_code=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar dados históricos: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao consultar banco de dados: {str(e)}"
+        )
 
 
 @app.post(
@@ -443,6 +563,15 @@ async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutp
         info_ticker = obter_info_ticker(ticker)
         ticker_info_str = f" ({info_ticker['nome']})" if info_ticker else ""
         
+        # Formatar data dos dados (verificar se index é datetime)
+        try:
+            if hasattr(df_original.index[-1], 'strftime'):
+                data_str = df_original.index[-1].strftime('%Y-%m-%d')
+            else:
+                data_str = "dados de fallback"
+        except:
+            data_str = "dados históricos"
+        
         # Log estruturado da previsão
         input_for_log = dados_lstm[0].tolist()  # Shape: (60, 5)
         
@@ -457,7 +586,7 @@ async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutp
             preco_previsto=round(valor_previsto, 2),
             confianca="alta",
             mensagem=f"Previsão para {ticker}{ticker_info_str} gerada com sucesso. "
-                    f"Modelo MAPE 1.53%. Dados: {df_original.index[-1].strftime('%Y-%m-%d')} "
+                    f"Modelo MAPE 1.53%. Dados até: {data_str} "
                     f"[ID: {request_id}]"
         )
         
