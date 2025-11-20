@@ -32,8 +32,8 @@ from src.data_preparation import (
     dividir_dados,
     salvar_dados_preparados
 )
-from src.model_builder import construir_modelo_lstm
-from src.model_training import treinar_modelo
+from src.model_builder import construir_modelo_lstm, compilar_modelo
+from src.model_training import treinar_modelo, configurar_callbacks
 
 
 def calcular_metricas(y_true, y_pred):
@@ -220,20 +220,42 @@ def main():
         print("\n🧠 ETAPA 4: Treinando novo modelo LSTM...")
         timesteps = X_train.shape[1]  # 60
         num_features = X_train.shape[2]  # 5
+        
+        # Construir modelo
         modelo = construir_modelo_lstm(timesteps=timesteps, features=num_features)
         
-        historico, modelo_treinado = treinar_modelo(
-            modelo,
-            X_train, y_train,
-            X_val, y_val,
-            epochs=50,
-            batch_size=32,
-            save_dir=str(models_dir / "temp")
+        # Compilar modelo
+        modelo = compilar_modelo(modelo)
+        print("✅ Modelo construído e compilado")
+        
+        # Preparar dados no formato esperado por treinar_modelo
+        dados = {
+            'X_train': X_train,
+            'y_train': y_train,
+            'X_val': X_val,
+            'y_val': y_val
+        }
+        
+        # Configurar callbacks (salva o melhor modelo automaticamente)
+        temp_dir = models_dir / "temp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        model_path = str(temp_dir / "lstm_model_best.h5")
+        callbacks = configurar_callbacks(model_path)
+        
+        # Treinar modelo
+        print("\n🚀 Iniciando treinamento...")
+        historico = treinar_modelo(
+            model=modelo,
+            dados=dados,
+            callbacks=callbacks
         )
         print("✅ Modelo treinado")
         
         # 5. Avaliar no conjunto de teste
         print("\n📊 ETAPA 5: Avaliando modelo no conjunto de teste...")
+        # O modelo treinado foi salvo pelos callbacks, carregar o melhor
+        from tensorflow.keras.models import load_model
+        modelo_treinado = load_model(model_path)
         y_pred = modelo_treinado.predict(X_test, verbose=0)
         
         # Desnormalizar previsões
