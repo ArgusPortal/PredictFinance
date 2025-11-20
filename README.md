@@ -15,6 +15,7 @@ O projeto contempla desde a coleta e preparação de dados históricos até o de
 - 🎨 **Interface Streamlit**: Dashboards interativos com análise descritiva e técnica
 - 🔄 **Atualização Automática**: GitHub Actions atualiza banco diariamente às 4h UTC
 - 📊 **Novo Endpoint**: `/data/historical` para consultas customizadas de período
+- 🔍 **Monitoramento de Performance**: Sistema completo de validação de previsões em produção
 
 ---
 
@@ -59,6 +60,7 @@ Acesse: `http://localhost:8501`
   - 🏗️ Arquitetura completa com cálculo de parâmetros
 - 🔮 Previsões em tempo real
 - 📈 Análise técnica (RSI, MACD, Bollinger Bands)
+- 🔍 **Monitoramento de Performance**: Dashboard com métricas de validação em produção
 
 📚 **Guia completo:** [`GUIA_STREAMLIT.md`](GUIA_STREAMLIT.md)
 
@@ -80,6 +82,16 @@ curl -X POST https://b3sa3-api.onrender.com/predict/auto \
 curl "https://b3sa3-api.onrender.com/data/historical/B3SA3.SA?start_date=2024-01-01&end_date=2024-12-31"
 ```
 
+#### Monitoramento de Performance
+
+```bash
+# Consultar métricas de performance em produção
+curl "https://b3sa3-api.onrender.com/monitoring/performance"
+
+# Validar previsões pendentes
+curl -X POST "https://b3sa3-api.onrender.com/monitoring/validate?days_back=7"
+```
+
 **Resposta:**
 ```json
 {
@@ -89,7 +101,8 @@ curl "https://b3sa3-api.onrender.com/data/historical/B3SA3.SA?start_date=2024-01
 }
 ```
 
-📚 **Mais exemplos:** Veja [`EXEMPLOS_USO_API.md`](EXEMPLOS_USO_API.md) para Python, JavaScript e outros casos de uso.
+📚 **Mais exemplos:** Veja [`EXEMPLOS_USO_API.md`](EXEMPLOS_USO_API.md) para Python, JavaScript e outros casos de uso.  
+📊 **Monitoramento:** Veja [`docs/MONITORING_SYSTEM.md`](docs/MONITORING_SYSTEM.md) para sistema completo de validação.
 
 ---
 
