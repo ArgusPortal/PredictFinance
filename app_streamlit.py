@@ -775,49 +775,49 @@ elif page == "🎯 Métricas do Modelo":
         if training_data:
             st.markdown("---")
             st.markdown("#### 📊 Estatísticas de Treinamento")
+            
+            treino = training_data.get('treinamento', {})
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Épocas Executadas",
+                    f"{treino.get('epocas_executadas', 0)}/{treino.get('epocas_configuradas', 0)}"
+                )
+                st.caption(f"Melhor época: {treino.get('best_epoch', 0)}")
+            
+            with col2:
+                final_train_loss = treino.get('final_train_loss', 0)
+                final_val_loss = treino.get('final_val_loss', 0)
+                st.metric(
+                    "Loss Final (Treino)",
+                    f"{final_train_loss:.6f}"
+                )
+                st.caption(f"Validação: {final_val_loss:.6f}")
+            
+            with col3:
+                final_train_mae = treino.get('final_train_mae', 0)
+                final_val_mae = treino.get('final_val_mae', 0)
+                st.metric(
+                    "MAE Final (Treino)",
+                    f"R$ {final_train_mae:.4f}"
+                )
+                st.caption(f"Validação: R$ {final_val_mae:.4f}")
+            
+            # Gráfico de evolução do histórico
+            if 'historico' in training_data:
+                st.markdown("---")
+                st.markdown("#### 📉 Evolução Detalhada do Treinamento")
                 
-                treino = training_data.get('treinamento', {})
+                hist = training_data['historico']
                 
-                col1, col2, col3 = st.columns(3)
+                # Criar dataframe
+                epocas = list(range(1, len(hist['loss']) + 1))
                 
-                with col1:
-                    st.metric(
-                        "Épocas Executadas",
-                        f"{treino.get('epocas_executadas', 0)}/{treino.get('epocas_configuradas', 0)}"
-                    )
-                    st.caption(f"Melhor época: {treino.get('best_epoch', 0)}")
+                fig = go.Figure()
                 
-                with col2:
-                    final_train_loss = treino.get('final_train_loss', 0)
-                    final_val_loss = treino.get('final_val_loss', 0)
-                    st.metric(
-                        "Loss Final (Treino)",
-                        f"{final_train_loss:.6f}"
-                    )
-                    st.caption(f"Validação: {final_val_loss:.6f}")
-                
-                with col3:
-                    final_train_mae = treino.get('final_train_mae', 0)
-                    final_val_mae = treino.get('final_val_mae', 0)
-                    st.metric(
-                        "MAE Final (Treino)",
-                        f"R$ {final_train_mae:.4f}"
-                    )
-                    st.caption(f"Validação: R$ {final_val_mae:.4f}")
-                
-                # Gráfico de evolução do histórico
-                if 'historico' in training_data:
-                    st.markdown("---")
-                    st.markdown("#### 📉 Evolução Detalhada do Treinamento")
-                    
-                    hist = training_data['historico']
-                    
-                    # Criar dataframe
-                    epocas = list(range(1, len(hist['loss']) + 1))
-                    
-                    fig = go.Figure()
-                    
-                    # Loss
+                # Loss
                     fig.add_trace(go.Scatter(
                         x=epocas,
                         y=hist['loss'],
