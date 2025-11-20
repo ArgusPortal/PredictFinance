@@ -23,8 +23,16 @@ def main():
         return False
     
     try:
-        from src.data_preparation import preparar_dados_lstm
-        print("   ✅ src.data_preparation.preparar_dados_lstm")
+        from src.data_preparation import (
+            normalizar_dados,
+            criar_sequencias,
+            dividir_dados,
+            salvar_dados_preparados
+        )
+        print("   ✅ src.data_preparation.normalizar_dados")
+        print("   ✅ src.data_preparation.criar_sequencias")
+        print("   ✅ src.data_preparation.dividir_dados")
+        print("   ✅ src.data_preparation.salvar_dados_preparados")
     except ImportError as e:
         print(f"   ❌ Erro: {e}")
         return False
