@@ -1,0 +1,13 @@
+{
+  "slack_webhook_url": null,
+  "email_config": {
+    "smtp_server": null,
+    "smtp_port": 587,
+    "sender_email": null,
+    "receiver_emails": [],
+    "password": null
+  },
+  "enable_slack": false,
+  "enable_email": false,
+  "enable_logs": true
+}
