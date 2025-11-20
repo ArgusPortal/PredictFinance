@@ -13,39 +13,112 @@ class PrevisaoInput(BaseModel):
     Modelo de dados para entrada do endpoint de previsão.
     
     Attributes:
-        prices: Lista de 60 valores de preços de fechamento consecutivos
-                (os mais recentes) para gerar a previsão do próximo dia.
+        dados: Array 2D com 60 dias de dados OHLCV (Open, High, Low, Close, Volume).
+               Cada linha representa um dia com 5 valores: [Open, High, Low, Close, Volume]
     """
-    prices: List[float] = Field(
+    dados: List[List[float]] = Field(
         ...,
-        description="Lista de 60 preços de fechamento consecutivos (valores em R$)",
+        description="Array 2D: 60 dias × 5 features [Open, High, Low, Close, Volume]",
         min_length=60,
         max_length=60,
-        examples=[[12.5, 12.6, 12.7, 12.8]]  # Exemplo simplificado
+        examples=[[
+            [12.5, 12.7, 12.4, 12.6, 1500000],
+            [12.6, 12.8, 12.5, 12.7, 1600000]
+        ]]  # Exemplo simplificado de 2 dias
     )
     
-    @field_validator('prices')
+    @field_validator('dados')
     @classmethod
-    def validar_precos(cls, v: List[float]) -> List[float]:
+    def validar_dados(cls, v: List[List[float]]) -> List[List[float]]:
         """
-        Valida que todos os preços são valores positivos.
+        Valida estrutura e valores dos dados OHLCV.
         
         Args:
-            v: Lista de preços a validar
+            v: Array 2D com dados a validar
             
         Returns:
-            Lista de preços validada
+            Array validado
             
         Raises:
-            ValueError: Se algum preço for negativo ou zero
+            ValueError: Se formato ou valores inválidos
         """
+        # Validar número de dias
         if len(v) != 60:
-            raise ValueError(f'É necessário fornecer exatamente 60 preços. Recebidos: {len(v)}')
+            raise ValueError(
+                f'É necessário fornecer exatamente 60 dias de dados. Recebidos: {len(v)}'
+            )
         
-        if any(p <= 0 for p in v):
-            raise ValueError('Todos os preços devem ser valores positivos maiores que zero')
+        # Validar cada dia
+        for i, dia in enumerate(v):
+            # Validar 5 features por dia
+            if len(dia) != 5:
+                raise ValueError(
+                    f'Cada dia deve ter 5 features [Open, High, Low, Close, Volume]. '
+                    f'Dia {i+1} tem {len(dia)} features'
+                )
+            
+            # Validar valores positivos (OHLC devem ser > 0, Volume >= 0)
+            open_val, high, low, close, volume = dia
+            if open_val <= 0 or high <= 0 or low <= 0 or close <= 0:
+                raise ValueError(
+                    f'Valores OHLC devem ser positivos. Dia {i+1}: {dia[:4]}'
+                )
+            
+            if volume < 0:
+                raise ValueError(
+                    f'Volume não pode ser negativo. Dia {i+1}: Volume={volume}'
+                )
+            
+            # Validar lógica High >= Low
+            if high < low:
+                raise ValueError(
+                    f'High deve ser >= Low. Dia {i+1}: High={high}, Low={low}'
+                )
         
         return v
+
+
+class PrevisaoAutoInput(BaseModel):
+    """
+    Modelo de dados para entrada do endpoint de previsão automática.
+    
+    Attributes:
+        ticker: Símbolo do ticker para busca automática (ex: 'B3SA3.SA')
+    """
+    ticker: str = Field(
+        ...,
+        description="Símbolo do ticker Yahoo Finance (ex: B3SA3.SA, PETR4.SA)",
+        min_length=2,
+        max_length=10,
+        examples=["B3SA3.SA", "PETR4.SA", "VALE3.SA"]
+    )
+    
+    @field_validator('ticker')
+    @classmethod
+    def validar_ticker(cls, v: str) -> str:
+        """
+        Valida formato básico do ticker.
+        
+        Args:
+            v: Ticker a validar
+            
+        Returns:
+            Ticker normalizado (uppercase, sem espaços)
+            
+        Raises:
+            ValueError: Se formato inválido
+        """
+        ticker = v.strip().upper()
+        
+        if not ticker:
+            raise ValueError('Ticker não pode ser vazio')
+        
+        if len(ticker) < 2 or len(ticker) > 10:
+            raise ValueError(
+                f'Ticker deve ter entre 2 e 10 caracteres. Recebido: {ticker}'
+            )
+        
+        return ticker
 
 
 class PrevisaoOutput(BaseModel):

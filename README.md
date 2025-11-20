@@ -6,13 +6,68 @@ Este projeto desenvolve um modelo preditivo de preços das ações da B3 S.A. (c
 
 O projeto contempla desde a coleta e preparação de dados históricos até o deploy de uma API REST para disponibilizar previsões em tempo real, incluindo monitoramento contínuo do modelo em produção.
 
+**✨ Novidade:** API com **busca automática de dados**! Basta fornecer o ticker (ex: `B3SA3.SA`) e a API busca automaticamente os últimos 60 dias de dados OHLCV do Yahoo Finance para gerar a previsão.
+
+**🎨 Novo:** Interface **Streamlit** com dashboards interativos, análise descritiva, métricas do modelo e análise técnica avançada!
+
+---
+
+## 🚀 Uso Rápido
+
+### 🖥️ Interface Streamlit (Recomendado)
+
+```bash
+# Terminal 1: Iniciar API
+python run_api.py
+
+# Terminal 2: Iniciar Streamlit
+streamlit run app_streamlit.py
+```
+
+Acesse: `http://localhost:8501`
+
+**Funcionalidades:**
+- 🏠 Dashboard com métricas do modelo
+- 📊 Análise descritiva com gráficos interativos (candlestick, volume, volatilidade, correlação)
+- 🎯 Métricas detalhadas do modelo LSTM com 4 abas:
+  - 📊 Gráficos de resultado do teste (série temporal + scatter)
+  - 📈 Curvas de aprendizado do treinamento (loss + MAE)
+  - ⚙️ Hiperparâmetros explicados e justificados
+  - 🏗️ Arquitetura completa com cálculo de parâmetros
+- 🔮 Previsões em tempo real
+- 📈 Análise técnica (RSI, MACD, Bollinger Bands)
+
+📚 **Guia completo:** [`GUIA_STREAMLIT.md`](GUIA_STREAMLIT.md)
+
+### 🌐 API REST
+
+#### Previsão Automática
+
+```bash
+curl -X POST https://b3sa3-api.onrender.com/predict/auto \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "B3SA3.SA"}'
+```
+
+**Resposta:**
+```json
+{
+  "preco_previsto": 12.85,
+  "confianca": "alta",
+  "mensagem": "Previsão para B3SA3.SA gerada com sucesso. Modelo MAPE 1.53%..."
+}
+```
+
+📚 **Mais exemplos:** Veja [`EXEMPLOS_USO_API.md`](EXEMPLOS_USO_API.md) para Python, JavaScript e outros casos de uso.
+
 ---
 
 ## 🎯 Objetivo
 
 Desenvolver um sistema completo de previsão de preços de ações que:
-- Utilize dados históricos da B3SA3.SA para treinamento
+- Utilize dados históricos da B3SA3.SA (5 features: Open, High, Low, Close, Volume)
 - Empregue arquitetura LSTM para capturar padrões temporais
+- **Busque dados automaticamente via Yahoo Finance**
 - Disponibilize previsões através de API REST
 - Esteja em produção com monitoramento ativo
 

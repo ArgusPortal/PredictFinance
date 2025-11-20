@@ -17,7 +17,8 @@ from typing import Dict, Any
 import numpy as np
 import joblib
 from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from tensorflow.keras.models import load_model
 
 # Adiciona o diretório raiz ao path para imports
@@ -26,6 +27,7 @@ sys.path.append(str(ROOT_DIR))
 
 from api.schemas import (
     PrevisaoInput,
+    PrevisaoAutoInput,
     PrevisaoOutput,
     HealthResponse,
     InfoModeloResponse
@@ -34,10 +36,19 @@ from api.schemas import (
 # Sistema de monitoramento (Fase 8)
 from api.monitoring import get_prediction_logger, get_metrics_logger
 
+# Módulo de busca automática de dados (Fase 9)
+from api.data_fetcher import (
+    buscar_dados_historicos,
+    formatar_dados_para_modelo,
+    validar_ticker_format,
+    obter_info_ticker
+)
+
 
 # Variáveis globais para armazenar modelo e scaler
 model = None
 scaler = None
+example_data = None  # Dados de exemplo pré-carregados
 WINDOW_SIZE = 60
 NUM_FEATURES = 5
 
@@ -50,7 +61,7 @@ async def lifespan(app: FastAPI):
     Carrega o modelo e scaler na inicialização e libera recursos
     no encerramento.
     """
-    global model, scaler
+    global model, scaler, example_data
     
     # Startup: Carregar modelo e scaler
     print("🚀 Iniciando API...")
@@ -60,6 +71,7 @@ async def lifespan(app: FastAPI):
         # Caminhos dos artefatos
         model_path = ROOT_DIR / "models" / "lstm_model_best.h5"
         scaler_path = ROOT_DIR / "models" / "scaler.pkl"
+        example_path = ROOT_DIR / "data" / "processed" / "example_input.npy"
         
         # Validar existência dos arquivos
         if not model_path.exists():
@@ -77,6 +89,14 @@ async def lifespan(app: FastAPI):
         print(f"   └─ Carregando scaler: {scaler_path}")
         scaler = joblib.load(str(scaler_path))
         print(f"   ✅ Scaler carregado com sucesso!")
+        
+        # Carregar dados de exemplo (opcional)
+        if example_path.exists():
+            print(f"   └─ Carregando dados de exemplo: {example_path}")
+            example_data = np.load(str(example_path))
+            print(f"   ✅ Dados de exemplo carregados! Shape: {example_data.shape}")
+        else:
+            print(f"   ⚠️  Dados de exemplo não encontrados (opcional)")
         
         print("✅ API pronta para receber requisições!\n")
         
@@ -103,11 +123,33 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Montar diretório de arquivos estáticos (interface web)
+static_dir = ROOT_DIR / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 
 @app.get(
     "/",
+    summary="Página Inicial",
+    description="Redireciona para interface web ou retorna status",
+    include_in_schema=False
+)
+async def root():
+    """
+    Redireciona para interface web se disponível, senão retorna health check.
+    """
+    index_file = ROOT_DIR / "static" / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    else:
+        return await health_check()
+
+
+@app.get(
+    "/api",
     response_model=HealthResponse,
-    summary="Health Check",
+    summary="Health Check API",
     description="Verifica se a API está ativa e operacional",
     tags=["Status"]
 )
@@ -223,40 +265,51 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
         )
     
     try:
-        # Extrair dados da requisição
-        dados = previsao_input.prices
+        # Extrair dados da requisição (agora é 2D array: 60 dias x 5 features)
+        dados = previsao_input.dados
         
-        # Verificar número de preços (validação adicional)
+        # Verificar dimensões (validação adicional)
         if len(dados) != WINDOW_SIZE:
             metrics_logger.increment_error()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"É necessário fornecer exatamente {WINDOW_SIZE} preços. Recebidos: {len(dados)}"
+                detail=f"É necessário fornecer exatamente {WINDOW_SIZE} dias de dados. Recebidos: {len(dados)}"
             )
         
-        # Converter para numpy array e reshape para normalização
-        # Shape: (60,) -> (60, 1) para passar pelo scaler
-        dados_array = np.array(dados).reshape(-1, 1)
+        # Converter para numpy array
+        # Shape: (60, 5) - 60 dias com 5 features cada [Open, High, Low, Close, Volume]
+        dados_array = np.array(dados)
+        
+        # Validar shape
+        if dados_array.shape != (WINDOW_SIZE, NUM_FEATURES):
+            metrics_logger.increment_error()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Shape esperado: ({WINDOW_SIZE}, {NUM_FEATURES}). Recebido: {dados_array.shape}"
+            )
         
         # Normalizar os dados usando o scaler
+        # Scaler espera shape (60, 5)
         dados_normalizados = scaler.transform(dados_array)
         
         # Reshape para formato esperado pelo modelo LSTM
-        # Shape: (60, 1) -> (1, 60, 1) 
-        # onde (batch_size, timesteps, features)
-        # Nota: Como o modelo foi treinado com 5 features, vamos replicar
-        # o valor normalizado para todas as 5 features
-        dados_lstm = np.repeat(dados_normalizados.reshape(1, WINDOW_SIZE, 1), NUM_FEATURES, axis=2)
+        # Shape: (60, 5) -> (1, 60, 5) onde (batch_size, timesteps, features)
+        dados_lstm = dados_normalizados.reshape(1, WINDOW_SIZE, NUM_FEATURES)
         
         # Fazer previsão
         predicao_normalizada = model.predict(dados_lstm, verbose=0)
         
         # Desnormalizar a previsão
-        # Shape: [[valor_normalizado]] -> R$ valor_real
-        predicao_real = scaler.inverse_transform(predicao_normalizada)
+        # O modelo retorna shape (1, 1) mas scaler espera (1, 5)
+        # Criar array com shape correto onde apenas Close (índice 3) importa
+        predicao_array = np.zeros((1, NUM_FEATURES))
+        predicao_array[0, 3] = predicao_normalizada[0, 0]  # Close é feature index 3
         
-        # Extrair valor escalar
-        valor_previsto = float(predicao_real[0, 0])
+        # Desnormalizar
+        predicao_real = scaler.inverse_transform(predicao_array)
+        
+        # Extrair valor previsto de Close
+        valor_previsto = float(predicao_real[0, 3])
         
         # Calcula tempo de processamento
         processing_time = (time.time() - start_time) * 1000  # em ms
@@ -289,12 +342,234 @@ async def fazer_previsao(previsao_input: PrevisaoInput) -> PrevisaoOutput:
         # Log do erro
         pred_logger.log_error(
             error_message=str(e),
-            input_data=previsao_input.prices if hasattr(previsao_input, 'prices') else None
+            input_data=previsao_input.dados if hasattr(previsao_input, 'dados') else None
         )
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao processar previsão: {str(e)}"
+        )
+
+
+@app.post(
+    "/predict/auto",
+    response_model=PrevisaoOutput,
+    summary="Previsão Automática via Ticker",
+    description="Busca automaticamente dados OHLCV do Yahoo Finance e gera previsão",
+    tags=["Previsão"],
+    status_code=status.HTTP_200_OK
+)
+async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutput:
+    """
+    Endpoint de previsão automática com busca de dados via Yahoo Finance.
+    
+    Recebe apenas um ticker (ex: 'B3SA3.SA') e automaticamente:
+    1. Busca últimos 60 dias de dados OHLCV via yfinance
+    2. Normaliza os dados
+    3. Gera previsão do próximo preço de fechamento
+    
+    Args:
+        previsao_input: Objeto contendo ticker symbol
+        
+    Returns:
+        PrevisaoOutput: Previsão do próximo preço
+        
+    Raises:
+        HTTPException: Se ticker inválido, dados insuficientes ou erro na previsão
+    """
+    # Inicializa loggers
+    pred_logger = get_prediction_logger()
+    metrics_logger = get_metrics_logger()
+    
+    # Incrementa contador de requisições
+    metrics_logger.increment_request()
+    
+    # Marca início do processamento
+    start_time = time.time()
+    
+    # Validar se modelo e scaler estão carregados
+    if model is None or scaler is None:
+        metrics_logger.increment_error()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Modelo não está carregado. Aguarde a inicialização da API."
+        )
+    
+    try:
+        # Validar e normalizar ticker
+        ticker = validar_ticker_format(previsao_input.ticker)
+        
+        # Buscar dados históricos do Yahoo Finance
+        dados_array, df_original = buscar_dados_historicos(
+            ticker=ticker,
+            dias=WINDOW_SIZE,
+            validar=True
+        )
+        
+        # Validar shape dos dados
+        if dados_array.shape != (WINDOW_SIZE, NUM_FEATURES):
+            metrics_logger.increment_error()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Dados retornados com shape incorreto: {dados_array.shape}"
+            )
+        
+        # Normalizar os dados usando o scaler
+        dados_normalizados = scaler.transform(dados_array)
+        
+        # Reshape para formato esperado pelo modelo LSTM
+        # Shape: (60, 5) -> (1, 60, 5)
+        dados_lstm = dados_normalizados.reshape(1, WINDOW_SIZE, NUM_FEATURES)
+        
+        # Fazer previsão
+        predicao_normalizada = model.predict(dados_lstm, verbose=0)
+        
+        # Desnormalizar a previsão
+        # Criar array com shape correto para inverse_transform
+        # Precisamos passar array (1, 5) onde apenas Close (índice 3) importa
+        predicao_array = np.zeros((1, NUM_FEATURES))
+        predicao_array[0, 3] = predicao_normalizada[0, 0]  # Close é feature index 3
+        
+        # Desnormalizar
+        predicao_real = scaler.inverse_transform(predicao_array)
+        
+        # Extrair valor previsto de Close
+        valor_previsto = float(predicao_real[0, 3])
+        
+        # Calcular tempo de processamento
+        processing_time = (time.time() - start_time) * 1000  # em ms
+        
+        # Obter informações do ticker
+        info_ticker = obter_info_ticker(ticker)
+        ticker_info_str = f" ({info_ticker['nome']})" if info_ticker else ""
+        
+        # Log estruturado da previsão
+        input_for_log = dados_lstm[0].tolist()  # Shape: (60, 5)
+        
+        request_id = pred_logger.log_prediction(
+            input_data=input_for_log,
+            prediction=valor_previsto,
+            processing_time_ms=processing_time
+        )
+        
+        # Retornar resposta
+        return PrevisaoOutput(
+            preco_previsto=round(valor_previsto, 2),
+            confianca="alta",
+            mensagem=f"Previsão para {ticker}{ticker_info_str} gerada com sucesso. "
+                    f"Modelo MAPE 1.53%. Dados: {df_original.index[-1].strftime('%Y-%m-%d')} "
+                    f"[ID: {request_id}]"
+        )
+        
+    except HTTPException:
+        # Re-lançar exceções HTTP (já tratadas)
+        raise
+        
+    except Exception as e:
+        # Capturar qualquer outro erro
+        metrics_logger.increment_error()
+        
+        # Log do erro
+        pred_logger.log_error(
+            error_message=str(e),
+            input_data={"ticker": previsao_input.ticker}
+        )
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao processar previsão automática: {str(e)}"
+        )
+
+
+@app.get(
+    "/predict/example",
+    response_model=PrevisaoOutput,
+    summary="Previsão com Dados de Exemplo",
+    description="Gera previsão usando dados de exemplo pré-carregados (demonstração)",
+    tags=["Previsão"],
+    status_code=status.HTTP_200_OK
+)
+async def fazer_previsao_exemplo() -> PrevisaoOutput:
+    """
+    Endpoint de demonstração com dados de exemplo pré-carregados.
+    
+    Não requer nenhum input - usa dados de teste reais salvos.
+    Ideal para testar rapidamente a API sem precisar fornecer dados.
+    
+    Returns:
+        PrevisaoOutput: Previsão do próximo preço
+        
+    Raises:
+        HTTPException: Se modelo não carregado ou dados de exemplo não disponíveis
+    """
+    # Inicializa loggers
+    pred_logger = get_prediction_logger()
+    metrics_logger = get_metrics_logger()
+    
+    # Incrementa contador
+    metrics_logger.increment_request()
+    
+    # Marca início
+    start_time = time.time()
+    
+    # Validar se modelo e dados estão carregados
+    if model is None or scaler is None:
+        metrics_logger.increment_error()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Modelo não está carregado. Aguarde a inicialização da API."
+        )
+    
+    if example_data is None:
+        metrics_logger.increment_error()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dados de exemplo não disponíveis. Execute: python generate_example_data.py"
+        )
+    
+    try:
+        # Usar dados de exemplo (já estão normalizados)
+        # Shape: (60, 5) -> (1, 60, 5)
+        dados_lstm = example_data.reshape(1, WINDOW_SIZE, NUM_FEATURES)
+        
+        # Fazer previsão
+        predicao_normalizada = model.predict(dados_lstm, verbose=0)
+        
+        # Desnormalizar
+        predicao_array = np.zeros((1, NUM_FEATURES))
+        predicao_array[0, 3] = predicao_normalizada[0, 0]
+        predicao_real = scaler.inverse_transform(predicao_array)
+        valor_previsto = float(predicao_real[0, 3])
+        
+        # Tempo de processamento
+        processing_time = (time.time() - start_time) * 1000
+        
+        # Log
+        input_for_log = dados_lstm[0].tolist()
+        request_id = pred_logger.log_prediction(
+            input_data=input_for_log,
+            prediction=valor_previsto,
+            processing_time_ms=processing_time
+        )
+        
+        # Retornar resposta
+        return PrevisaoOutput(
+            preco_previsto=round(valor_previsto, 2),
+            confianca="alta",
+            mensagem=f"Previsão de exemplo gerada com sucesso. "
+                    f"Usando dados reais do conjunto de teste. "
+                    f"Modelo MAPE 1.53%. [ID: {request_id}]"
+        )
+        
+    except Exception as e:
+        metrics_logger.increment_error()
+        pred_logger.log_error(
+            error_message=str(e),
+            input_data=None
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao processar previsão de exemplo: {str(e)}"
         )
 
 

@@ -5,6 +5,9 @@
 evidently==0.4.38
 scipy==1.11.4
 
+# Environment Configuration
+python-dotenv==1.0.1
+
 # Alertas e Notificações
 requests==2.31.0
 

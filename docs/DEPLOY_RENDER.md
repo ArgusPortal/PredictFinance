@@ -254,16 +254,13 @@ curl https://b3sa3-api.onrender.com/info
 ### Teste 3: Fazer Previsão
 
 ```bash
-curl -X POST https://b3sa3-api.onrender.com/predict \
+# Opção 1: Previsão AUTOMÁTICA (recomendado)
+curl -X POST https://b3sa3-api.onrender.com/predict/auto \
   -H "Content-Type: application/json" \
-  -d '{
-    "prices": [12.5, 12.6, 12.7, 12.8, 12.9, 13.0, 13.1, 13.2, 13.3, 13.4,
-               13.5, 13.6, 13.7, 13.8, 13.9, 14.0, 14.1, 14.2, 14.3, 14.4,
-               14.5, 14.6, 14.7, 14.8, 14.9, 15.0, 14.9, 14.8, 14.7, 14.6,
-               14.5, 14.4, 14.3, 14.2, 14.1, 14.0, 13.9, 13.8, 13.7, 13.6,
-               13.5, 13.4, 13.3, 13.2, 13.1, 13.0, 12.9, 12.8, 12.7, 12.6,
-               12.5, 12.4, 12.3, 12.2, 12.1, 12.0, 11.9, 11.8, 11.7, 11.6]
-  }'
+  -d '{"ticker": "B3SA3.SA"}'
+
+# Opção 2: Previsão com dados manuais (60 dias × 5 features)
+# Veja docs/FASE_7_GUIA.md para exemplo completo
 ```
 
 **Resposta esperada**:
@@ -271,7 +268,7 @@ curl -X POST https://b3sa3-api.onrender.com/predict \
 {
   "preco_previsto": 11.52,
   "confianca": "alta",
-  "mensagem": "Previsão gerada com sucesso. Modelo com MAPE de 1.53% no teste."
+  "mensagem": "Previsão para B3SA3.SA gerada com sucesso. Modelo MAPE 1.53%..."
 }
 ```
 
