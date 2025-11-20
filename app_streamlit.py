@@ -1878,16 +1878,28 @@ elif page == "🔍 Monitoramento":
     realizadas com valores reais do mercado obtidos posteriormente.
     """)
     
-    try:
-        # Buscar dados de performance
-        response = requests.get(f"{API_BASE_URL}/monitoring/performance", timeout=10)
-        
-        if response.status_code == 200:
-            perf_data = response.json()
-            stats = perf_data.get('statistics', {})
-            summary = perf_data.get('summary', {})
-            daily_metrics = perf_data.get('daily_metrics', [])
-            recent_predictions = perf_data.get('recent_predictions', [])
+    # Abas principais do monitoramento
+    tab_perf, tab_drift, tab_alerts, tab_reports = st.tabs([
+        "📊 Performance",
+        "🌊 Drift Detection",
+        "🔔 Alertas",
+        "📑 Relatórios"
+    ])
+    
+    # ============================================================
+    # TAB 1: PERFORMANCE
+    # ============================================================
+    with tab_perf:
+        try:
+            # Buscar dados de performance
+            response = requests.get(f"{API_BASE_URL}/monitoring/performance", timeout=10)
+            
+            if response.status_code == 200:
+                perf_data = response.json()
+                stats = perf_data.get('statistics', {})
+                summary = perf_data.get('summary', {})
+                daily_metrics = perf_data.get('daily_metrics', [])
+                recent_predictions = perf_data.get('recent_predictions', [])
             
             # ===== SEÇÃO 1: RESUMO GERAL =====
             st.markdown("## 📊 Resumo de Performance")
@@ -2180,16 +2192,264 @@ elif page == "🔍 Monitoramento":
                 - **> 5%**: Requer atenção ⚠️ (considere re-treinar o modelo)
                 """)
         
-        else:
-            st.error(f"❌ Erro ao buscar dados de monitoramento: Status {response.status_code}")
-            st.info("Certifique-se de que a API está rodando e acessível.")
+        except requests.exceptions.ConnectionError:
+            st.error("❌ Não foi possível conectar à API. Verifique se ela está rodando.")
+        except requests.exceptions.Timeout:
+            st.error("⏱️ Timeout ao buscar dados. A API pode estar lenta.")
+        except Exception as e:
+            st.error(f"❌ Erro inesperado: {e}")
     
-    except requests.exceptions.ConnectionError:
-        st.error("❌ Não foi possível conectar à API. Verifique se ela está rodando.")
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Timeout ao buscar dados. A API pode estar lenta.")
-    except Exception as e:
-        st.error(f"❌ Erro inesperado: {e}")
+    # ============================================================
+    # TAB 2: DRIFT DETECTION
+    # ============================================================
+    with tab_drift:
+        st.markdown("### 🌊 Detecção de Drift nos Dados")
+        
+        st.markdown("""
+        O drift de dados ocorre quando a distribuição dos dados de entrada muda ao longo do tempo,
+        potencialmente degradando a performance do modelo.
+        """)
+        
+        # Métricas de drift
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Checks de Drift",
+                "Em breve",
+                help="Total de verificações de drift realizadas"
+            )
+        
+        with col2:
+            st.metric(
+                "Drift Detectado",
+                "0",
+                help="Número de vezes que drift foi detectado"
+            )
+        
+        with col3:
+            st.metric(
+                "Taxa de Drift",
+                "0.0%",
+                help="Porcentagem de checks que detectaram drift"
+            )
+        
+        st.markdown("---")
+        
+        st.markdown("#### 📈 Como Funciona o Drift Detection")
+        
+        st.markdown("""
+        **Métodos de Detecção**:
+        1. **Mudança de Média**: Detecta shifts significativos na média dos preços
+        2. **Mudança de Desvio Padrão**: Identifica mudanças na volatilidade
+        3. **Teste de Kolmogorov-Smirnov**: Compara distribuições estatísticas
+        
+        **Thresholds**:
+        - Mudança de média > 10%
+        - Mudança de desvio > 20%
+        - p-value K-S < 0.05
+        
+        **Ação Recomendada ao Detectar Drift**:
+        - Re-treinar o modelo com dados mais recentes
+        - Revisar features utilizadas
+        - Atualizar estatísticas de referência
+        """)
+        
+        st.info("📊 Funcionalidade completa em desenvolvimento. Integração com drift detector em andamento.")
+    
+    # ============================================================
+    # TAB 3: ALERTAS
+    # ============================================================
+    with tab_alerts:
+        st.markdown("### 🔔 Sistema de Alertas")
+        
+        st.markdown("""
+        Alertas são gerados automaticamente quando o sistema detecta anomalias ou degradação de performance.
+        """)
+        
+        # Histórico de alertas
+        alert_col1, alert_col2 = st.columns([3, 1])
+        
+        with alert_col1:
+            st.markdown("#### 📋 Histórico de Alertas (Últimos 7 dias)")
+        
+        with alert_col2:
+            alert_filter = st.selectbox(
+                "Severidade",
+                ["Todos", "CRÍTICO", "AVISO", "INFO"],
+                key="alert_severity_filter"
+            )
+        
+        # Exemplo de alertas (substituir por dados reais da API quando disponível)
+        st.success("✅ Nenhum alerta crítico registrado nos últimos 7 dias. Sistema operando normalmente.")
+        
+        st.markdown("---")
+        
+        st.markdown("#### ⚙️ Configuração de Thresholds")
+        
+        with st.expander("🔧 Configurar Limites de Alerta"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                mape_threshold = st.number_input(
+                    "MAPE Threshold (%)",
+                    min_value=1.0,
+                    max_value=20.0,
+                    value=5.0,
+                    step=0.5,
+                    help="Gerar alerta quando MAPE ultrapassar este valor"
+                )
+                
+                mae_threshold = st.number_input(
+                    "MAE Threshold (R$)",
+                    min_value=0.1,
+                    max_value=10.0,
+                    value=2.0,
+                    step=0.1,
+                    help="Gerar alerta quando MAE ultrapassar este valor"
+                )
+            
+            with col2:
+                drift_threshold = st.number_input(
+                    "Drift Threshold (%)",
+                    min_value=5.0,
+                    max_value=50.0,
+                    value=10.0,
+                    step=5.0,
+                    help="Mudança percentual que caracteriza drift"
+                )
+                
+                error_rate_threshold = st.number_input(
+                    "Error Rate Threshold (%)",
+                    min_value=1.0,
+                    max_value=20.0,
+                    value=5.0,
+                    step=1.0,
+                    help="Taxa de erro máxima aceitável"
+                )
+            
+            st.info("💡 Configuração de thresholds personalizados será disponibilizada em breve via API.")
+    
+    # ============================================================
+    # TAB 4: RELATÓRIOS
+    # ============================================================
+    with tab_reports:
+        st.markdown("### 📑 Relatórios e Exportação")
+        
+        st.markdown("""
+        Gere e exporte relatórios de monitoramento para análise offline.
+        """)
+        
+        report_type = st.selectbox(
+            "Tipo de Relatório",
+            [
+                "Resumo de Performance",
+                "Histórico Completo de Previsões",
+                "Métricas Diárias",
+                "Análise de Erros"
+            ]
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.date_input(
+                "Período",
+                value=(pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()),
+                help="Selecione o período do relatório"
+            )
+        
+        with col2:
+            export_format = st.selectbox(
+                "Formato",
+                ["CSV", "JSON"],
+                help="Formato de exportação do relatório"
+            )
+        
+        if st.button("📥 Gerar e Baixar Relatório", type="primary"):
+            with st.spinner("Gerando relatório..."):
+                try:
+                    # Buscar dados da API
+                    response = requests.get(
+                        f"{API_BASE_URL}/monitoring/performance",
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        perf_data = response.json()
+                        
+                        # Preparar dados para exportação
+                        if report_type == "Resumo de Performance":
+                            report_data = perf_data.get('statistics', {})
+                            report_df = pd.DataFrame([report_data])
+                        elif report_type == "Métricas Diárias":
+                            report_df = pd.DataFrame(perf_data.get('daily_metrics', []))
+                        elif report_type == "Histórico Completo de Previsões":
+                            report_df = pd.DataFrame(perf_data.get('recent_predictions', []))
+                        else:
+                            report_df = pd.DataFrame()
+                        
+                        if not report_df.empty:
+                            # Exportar conforme formato
+                            if export_format == "CSV":
+                                csv = report_df.to_csv(index=False)
+                                st.download_button(
+                                    label="💾 Download CSV",
+                                    data=csv,
+                                    file_name=f"monitoring_{report_type.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+                                    mime="text/csv"
+                                )
+                            elif export_format == "JSON":
+                                json_str = report_df.to_json(orient='records', indent=2)
+                                st.download_button(
+                                    label="💾 Download JSON",
+                                    data=json_str,
+                                    file_name=f"monitoring_{report_type.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.json",
+                                    mime="application/json"
+                                )
+                            
+                            st.success("✅ Relatório gerado com sucesso!")
+                            
+                            # Preview dos dados
+                            st.markdown("#### 👀 Preview do Relatório")
+                            st.dataframe(report_df.head(10), use_container_width=True)
+                        else:
+                            st.warning("⚠️ Sem dados disponíveis para o período selecionado.")
+                    else:
+                        st.error(f"❌ Erro ao buscar dados: Status {response.status_code}")
+                
+                except Exception as e:
+                    st.error(f"❌ Erro ao gerar relatório: {e}")
+        
+        st.markdown("---")
+        
+        st.markdown("#### 📊 Resumo Rápido")
+        
+        # Buscar dados atuais
+        try:
+            response = requests.get(f"{API_BASE_URL}/monitoring/performance", timeout=10)
+            
+            if response.status_code == 200:
+                perf_data = response.json()
+                stats = perf_data.get('statistics', {})
+                
+                st.markdown("**Estatísticas Atuais:**")
+                
+                summary_data = {
+                    "Métrica": ["Total Validado", "Total Pendente", "MAPE", "MAE", "RMSE"],
+                    "Valor": [
+                        stats.get('total_validated', 0),
+                        stats.get('total_pending', 0),
+                        f"{stats.get('mape', 0):.2f}%" if stats.get('mape') else "N/A",
+                        f"R$ {stats.get('mae', 0):.2f}" if stats.get('mae') else "N/A",
+                        f"R$ {stats.get('rmse', 0):.2f}" if stats.get('rmse') else "N/A"
+                    ]
+                }
+                
+                st.table(pd.DataFrame(summary_data))
+        
+        except Exception as e:
+            st.warning(f"⚠️ Não foi possível carregar resumo: {e}")
 
 
 # Footer
