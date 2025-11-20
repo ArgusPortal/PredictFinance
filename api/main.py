@@ -38,6 +38,9 @@ from api.schemas import (
 # Sistema de monitoramento (Fase 8)
 from api.monitoring import get_prediction_logger, get_metrics_logger
 
+# Sistema de validação de performance (Fase 12)
+from src.performance_monitor import PerformanceMonitor
+
 # Módulo de busca automática de dados (Fase 9)
 from api.data_fetcher import (
     buscar_dados_historicos,
@@ -581,6 +584,18 @@ async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutp
             processing_time_ms=processing_time
         )
         
+        # Registrar previsão no sistema de monitoramento (Fase 12)
+        try:
+            monitor = PerformanceMonitor(ticker=ticker)
+            monitor.register_prediction(
+                prediction_value=valor_previsto,
+                prediction_date=datetime.now().isoformat(),
+                request_id=request_id
+            )
+        except Exception as mon_error:
+            # Não falhar a previsão se monitoramento falhar
+            print(f"⚠️  Erro ao registrar no monitoramento: {mon_error}")
+        
         # Retornar resposta
         return PrevisaoOutput(
             preco_previsto=round(valor_previsto, 2),
@@ -759,6 +774,184 @@ async def obter_metricas() -> Dict[str, Any]:
             }
         }
     }
+
+
+# ============================================================
+# ENDPOINTS DE MONITORAMENTO DE PERFORMANCE
+# ============================================================
+
+@app.post(
+    "/monitoring/register",
+    summary="Registrar Previsão para Monitoramento",
+    description="Registra uma previsão para validação futura contra dados reais",
+    tags=["Monitoramento"]
+)
+async def registrar_previsao_monitoramento(
+    prediction_value: float,
+    ticker: str = "B3SA3.SA",
+    request_id: str = None
+) -> Dict[str, Any]:
+    """
+    Registra uma previsão no sistema de monitoramento para validação posterior.
+    
+    Args:
+        prediction_value: Valor previsto
+        ticker: Símbolo da ação
+        request_id: ID da requisição
+    
+    Returns:
+        Confirmação do registro
+    """
+    try:
+        monitor = PerformanceMonitor(ticker=ticker)
+        monitor.register_prediction(
+            prediction_value=prediction_value,
+            prediction_date=datetime.now().isoformat(),
+            request_id=request_id
+        )
+        
+        return {
+            "status": "success",
+            "message": "Previsão registrada para monitoramento",
+            "prediction_value": prediction_value,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao registrar previsão: {str(e)}"
+        )
+
+
+@app.get(
+    "/monitoring/performance",
+    summary="Métricas de Performance em Produção",
+    description="Retorna métricas de validação de previsões contra valores reais",
+    tags=["Monitoramento"]
+)
+async def obter_performance_producao(ticker: str = "B3SA3.SA") -> Dict[str, Any]:
+    """
+    Retorna métricas de performance do modelo em produção.
+    
+    Compara previsões realizadas com valores reais do mercado.
+    
+    Args:
+        ticker: Símbolo da ação
+    
+    Returns:
+        Métricas de performance e histórico
+    """
+    try:
+        monitor = PerformanceMonitor(ticker=ticker)
+        
+        # Carrega histórico de métricas
+        metrics_history = monitor.metrics_history
+        
+        # Carrega previsões (validadas e pendentes)
+        predictions_db = monitor.predictions_db
+        
+        # Conta previsões por status
+        validated = [p for p in predictions_db.get("predictions", []) if p.get("validated")]
+        pending = [p for p in predictions_db.get("predictions", []) if not p.get("validated")]
+        
+        # Calcula estatísticas das validadas
+        if validated:
+            errors = [p.get("error", 0) for p in validated if p.get("error") is not None]
+            error_pcts = [p.get("error_pct", 0) for p in validated if p.get("error_pct") is not None]
+            
+            stats = {
+                "total_validated": len(validated),
+                "total_pending": len(pending),
+                "mae": float(np.mean(errors)) if errors else None,
+                "mape": float(np.mean(error_pcts)) if error_pcts else None,
+                "rmse": float(np.sqrt(np.mean([e**2 for e in errors]))) if errors else None,
+                "min_error_pct": float(min(error_pcts)) if error_pcts else None,
+                "max_error_pct": float(max(error_pcts)) if error_pcts else None,
+                "avg_predicted": float(np.mean([p.get("predicted_value", 0) for p in validated])),
+                "avg_actual": float(np.mean([p.get("actual_value", 0) for p in validated if p.get("actual_value")])) if any(p.get("actual_value") for p in validated) else None
+            }
+        else:
+            stats = {
+                "total_validated": 0,
+                "total_pending": len(pending),
+                "mae": None,
+                "mape": None,
+                "rmse": None,
+                "min_error_pct": None,
+                "max_error_pct": None,
+                "avg_predicted": None,
+                "avg_actual": None
+            }
+        
+        return {
+            "ticker": ticker,
+            "timestamp": datetime.now().isoformat(),
+            "summary": metrics_history.get("summary", {}),
+            "statistics": stats,
+            "daily_metrics": metrics_history.get("daily_metrics", [])[-30:],  # Últimos 30 dias
+            "recent_predictions": [
+                {
+                    "request_id": p.get("request_id"),
+                    "timestamp": p.get("timestamp"),
+                    "predicted": p.get("predicted_value"),
+                    "actual": p.get("actual_value"),
+                    "error_pct": p.get("error_pct"),
+                    "validated": p.get("validated")
+                }
+                for p in sorted(
+                    predictions_db.get("predictions", []),
+                    key=lambda x: x.get("timestamp", ""),
+                    reverse=True
+                )[:20]  # Últimas 20 previsões
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter métricas de performance: {str(e)}"
+        )
+
+
+@app.post(
+    "/monitoring/validate",
+    summary="Validar Previsões Pendentes",
+    description="Executa validação de previsões pendentes contra dados reais do mercado",
+    tags=["Monitoramento"]
+)
+async def validar_previsoes_pendentes(
+    ticker: str = "B3SA3.SA",
+    days_back: int = 7
+) -> Dict[str, Any]:
+    """
+    Valida previsões pendentes comparando com dados reais.
+    
+    Args:
+        ticker: Símbolo da ação
+        days_back: Quantos dias atrás buscar dados reais
+    
+    Returns:
+        Resultado da validação
+    """
+    try:
+        monitor = PerformanceMonitor(ticker=ticker)
+        result = monitor.validate_predictions(days_back=days_back)
+        
+        # Detecta degradação
+        degradation = monitor.detect_degradation(threshold_mape=5.0)
+        
+        return {
+            "status": "success",
+            "ticker": ticker,
+            "timestamp": datetime.now().isoformat(),
+            "validation_result": result,
+            "degradation_detected": degradation,
+            "message": "Validação concluída com sucesso"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao validar previsões: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ with st.sidebar:
     # Seleção de página
     page = st.radio(
         "Navegação",
-        ["🏠 Início", "📊 Análise Descritiva", "🎯 Métricas do Modelo", "🔮 Previsão", "📈 Análise Técnica"],
+        ["🏠 Início", "📊 Análise Descritiva", "🎯 Métricas do Modelo", "🔮 Previsão", "📈 Análise Técnica", "🔍 Monitoramento"],
         label_visibility="collapsed"
     )
     
@@ -1865,6 +1865,331 @@ Você é um analista financeiro especializado em análise técnica. Analise os s
         
         except Exception as e:
             st.error(f"❌ Erro: {e}")
+
+
+# ============================================================
+# PÁGINA 6: MONITORAMENTO
+# ============================================================
+elif page == "🔍 Monitoramento":
+    st.markdown('<h1 class="main-header">🔍 Monitoramento de Performance</h1>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    Esta página monitora a performance do modelo em produção, comparando previsões 
+    realizadas com valores reais do mercado obtidos posteriormente.
+    """)
+    
+    try:
+        # Buscar dados de performance
+        response = requests.get(f"{API_BASE_URL}/monitoring/performance", timeout=10)
+        
+        if response.status_code == 200:
+            perf_data = response.json()
+            stats = perf_data.get('statistics', {})
+            summary = perf_data.get('summary', {})
+            daily_metrics = perf_data.get('daily_metrics', [])
+            recent_predictions = perf_data.get('recent_predictions', [])
+            
+            # ===== SEÇÃO 1: RESUMO GERAL =====
+            st.markdown("## 📊 Resumo de Performance")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                total_val = stats.get('total_validated', 0)
+                st.metric(
+                    "Previsões Validadas",
+                    total_val,
+                    help="Total de previsões comparadas com valores reais"
+                )
+            
+            with col2:
+                total_pend = stats.get('total_pending', 0)
+                st.metric(
+                    "Previsões Pendentes",
+                    total_pend,
+                    help="Previsões aguardando dados reais para validação"
+                )
+            
+            with col3:
+                mape = stats.get('mape')
+                if mape is not None:
+                    delta_color = "inverse" if mape < 5 else "normal"
+                    st.metric(
+                        "MAPE Produção",
+                        f"{mape:.2f}%",
+                        delta=f"{'✅' if mape < 5 else '⚠️'} {'Excelente' if mape < 2 else 'Bom' if mape < 5 else 'Atenção'}",
+                        help="Erro Percentual Absoluto Médio em produção"
+                    )
+                else:
+                    st.metric("MAPE Produção", "N/A", help="Sem dados validados ainda")
+            
+            with col4:
+                mae = stats.get('mae')
+                if mae is not None:
+                    st.metric(
+                        "MAE Produção",
+                        f"R$ {mae:.2f}",
+                        help="Erro Absoluto Médio em reais"
+                    )
+                else:
+                    st.metric("MAE Produção", "N/A", help="Sem dados validados ainda")
+            
+            st.markdown("---")
+            
+            # ===== SEÇÃO 2: GRÁFICOS DE PERFORMANCE =====
+            if daily_metrics and len(daily_metrics) > 0:
+                st.markdown("## 📈 Evolução de Performance")
+                
+                tab1, tab2, tab3 = st.tabs(["MAPE ao Longo do Tempo", "MAE e RMSE", "Análise de Erros"])
+                
+                with tab1:
+                    # Gráfico de MAPE
+                    df_metrics = pd.DataFrame(daily_metrics)
+                    
+                    if 'timestamp' in df_metrics.columns and 'mape' in df_metrics.columns:
+                        df_metrics['date'] = pd.to_datetime(df_metrics['timestamp']).dt.date
+                        
+                        fig_mape = go.Figure()
+                        
+                        fig_mape.add_trace(go.Scatter(
+                            x=df_metrics['date'],
+                            y=df_metrics['mape'],
+                            mode='lines+markers',
+                            name='MAPE',
+                            line=dict(color='#FF6B6B', width=3),
+                            marker=dict(size=8)
+                        ))
+                        
+                        # Linha de threshold
+                        fig_mape.add_hline(
+                            y=5.0,
+                            line_dash="dash",
+                            line_color="orange",
+                            annotation_text="Threshold (5%)",
+                            annotation_position="right"
+                        )
+                        
+                        fig_mape.update_layout(
+                            title='Erro Percentual Absoluto Médio ao Longo do Tempo',
+                            xaxis_title='Data',
+                            yaxis_title='MAPE (%)',
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        st.plotly_chart(fig_mape, use_container_width=True)
+                        
+                        # Análise de tendência
+                        if len(df_metrics) >= 3:
+                            recent_mape = df_metrics['mape'].tail(3).mean()
+                            older_mape = df_metrics['mape'].head(3).mean() if len(df_metrics) >= 6 else df_metrics['mape'].head().mean()
+                            
+                            if recent_mape < older_mape:
+                                st.success(f"📈 Tendência positiva: MAPE melhorou de {older_mape:.2f}% para {recent_mape:.2f}%")
+                            elif recent_mape > older_mape:
+                                st.warning(f"📉 Tendência de degradação: MAPE aumentou de {older_mape:.2f}% para {recent_mape:.2f}%")
+                            else:
+                                st.info("➡️ Performance estável")
+                
+                with tab2:
+                    # Gráfico MAE e RMSE
+                    if 'mae' in df_metrics.columns and 'rmse' in df_metrics.columns:
+                        fig_errors = go.Figure()
+                        
+                        fig_errors.add_trace(go.Scatter(
+                            x=df_metrics['date'],
+                            y=df_metrics['mae'],
+                            mode='lines+markers',
+                            name='MAE',
+                            line=dict(color='#4ECDC4', width=2),
+                            marker=dict(size=6)
+                        ))
+                        
+                        fig_errors.add_trace(go.Scatter(
+                            x=df_metrics['date'],
+                            y=df_metrics['rmse'],
+                            mode='lines+markers',
+                            name='RMSE',
+                            line=dict(color='#95E1D3', width=2),
+                            marker=dict(size=6)
+                        ))
+                        
+                        fig_errors.update_layout(
+                            title='Métricas de Erro (MAE e RMSE)',
+                            xaxis_title='Data',
+                            yaxis_title='Erro (R$)',
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        st.plotly_chart(fig_errors, use_container_width=True)
+                
+                with tab3:
+                    # Análise de distribuição de erros
+                    if stats.get('min_error_pct') is not None and stats.get('max_error_pct') is not None:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.metric("Erro Mínimo", f"{stats['min_error_pct']:.2f}%")
+                            st.metric("Erro Máximo", f"{stats['max_error_pct']:.2f}%")
+                        
+                        with col2:
+                            if stats.get('avg_predicted') and stats.get('avg_actual'):
+                                diff_pct = ((stats['avg_predicted'] - stats['avg_actual']) / stats['avg_actual']) * 100
+                                st.metric(
+                                    "Preço Médio Previsto",
+                                    f"R$ {stats['avg_predicted']:.2f}"
+                                )
+                                st.metric(
+                                    "Preço Médio Real",
+                                    f"R$ {stats['avg_actual']:.2f}",
+                                    delta=f"{diff_pct:+.2f}%"
+                                )
+            
+            st.markdown("---")
+            
+            # ===== SEÇÃO 3: PREVISÕES RECENTES =====
+            st.markdown("## 📋 Previsões Recentes")
+            
+            if recent_predictions:
+                # Filtros
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    filter_status = st.selectbox(
+                        "Filtrar por status",
+                        ["Todas", "Validadas", "Pendentes"]
+                    )
+                
+                with col2:
+                    show_limit = st.number_input("Mostrar últimas", min_value=5, max_value=50, value=10, step=5)
+                
+                # Aplicar filtros
+                filtered_preds = recent_predictions[:show_limit]
+                
+                if filter_status == "Validadas":
+                    filtered_preds = [p for p in filtered_preds if p.get('validated')]
+                elif filter_status == "Pendentes":
+                    filtered_preds = [p for p in filtered_preds if not p.get('validated')]
+                
+                # Criar DataFrame
+                if filtered_preds:
+                    df_preds = pd.DataFrame(filtered_preds)
+                    
+                    # Formatar colunas
+                    df_display = pd.DataFrame({
+                        'ID': [p.get('request_id', 'N/A')[:8] for p in filtered_preds],
+                        'Data/Hora': [pd.to_datetime(p.get('timestamp')).strftime('%Y-%m-%d %H:%M') if p.get('timestamp') else 'N/A' for p in filtered_preds],
+                        'Previsto (R$)': [f"{p.get('predicted', 0):.2f}" for p in filtered_preds],
+                        'Real (R$)': [f"{p.get('actual', 0):.2f}" if p.get('actual') else '⏳ Pendente' for p in filtered_preds],
+                        'Erro (%)': [f"{p.get('error_pct', 0):.2f}%" if p.get('error_pct') is not None else '⏳' for p in filtered_preds],
+                        'Status': ['✅ Validado' if p.get('validated') else '⏳ Pendente' for p in filtered_preds]
+                    })
+                    
+                    st.dataframe(
+                        df_display,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # Estatísticas rápidas
+                    validated_count = len([p for p in filtered_preds if p.get('validated')])
+                    st.caption(f"📊 Mostrando {len(filtered_preds)} previsões ({validated_count} validadas, {len(filtered_preds) - validated_count} pendentes)")
+                else:
+                    st.info("Nenhuma previsão encontrada com os filtros selecionados.")
+            else:
+                st.info("📭 Nenhuma previsão registrada ainda. Realize previsões usando a página 🔮 Previsão.")
+            
+            st.markdown("---")
+            
+            # ===== SEÇÃO 4: VALIDAÇÃO MANUAL =====
+            st.markdown("## 🔄 Validação Manual")
+            
+            st.markdown("""
+            Execute a validação manual para comparar previsões pendentes com dados reais do mercado.
+            """)
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                days_back = st.slider(
+                    "Buscar dados dos últimos N dias",
+                    min_value=1,
+                    max_value=30,
+                    value=7,
+                    help="Quantos dias atrás buscar dados do mercado para validação"
+                )
+            
+            with col2:
+                st.write("")  # Espaçamento
+                st.write("")
+                if st.button("🔄 Executar Validação", type="primary", use_container_width=True):
+                    with st.spinner("Validando previsões..."):
+                        try:
+                            val_response = requests.post(
+                                f"{API_BASE_URL}/monitoring/validate",
+                                params={"days_back": days_back},
+                                timeout=30
+                            )
+                            
+                            if val_response.status_code == 200:
+                                val_result = val_response.json()
+                                validation = val_result.get('validation_result', {})
+                                
+                                st.success("✅ Validação concluída!")
+                                
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    st.metric("Validadas", validation.get('validated', 0))
+                                with col_b:
+                                    st.metric("Pendentes", validation.get('pending', 0))
+                                
+                                if val_result.get('degradation_detected'):
+                                    st.error("⚠️ **ALERTA**: Degradação do modelo detectada! Considere re-treinar o modelo.")
+                                else:
+                                    st.success("✅ Performance do modelo dentro do esperado.")
+                                
+                                # Recarregar página após validação
+                                st.rerun()
+                            else:
+                                st.error(f"Erro ao validar: {val_response.status_code}")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao executar validação: {e}")
+            
+            # Informações adicionais
+            with st.expander("ℹ️ Como funciona o monitoramento?"):
+                st.markdown("""
+                ### Sistema de Monitoramento em Produção
+                
+                1. **Registro Automático**: Toda previsão realizada pela API é automaticamente registrada
+                2. **Coleta de Dados Reais**: Sistema busca os preços reais do mercado após o dia da previsão
+                3. **Cálculo de Métricas**: Compara valores previstos vs reais e calcula MAE, MAPE, RMSE
+                4. **Detecção de Degradação**: Alerta quando MAPE ultrapassa 5% (threshold configurável)
+                5. **Histórico**: Mantém registro de todas as validações para análise de tendências
+                
+                ### Métricas Explicadas
+                
+                - **MAE (Mean Absolute Error)**: Erro médio em reais (R$)
+                - **MAPE (Mean Absolute Percentage Error)**: Erro médio percentual (%)
+                - **RMSE (Root Mean Squared Error)**: Raiz do erro quadrático médio (penaliza erros grandes)
+                
+                ### Threshold de Qualidade
+                
+                - **< 2%**: Excelente ✅
+                - **2-5%**: Bom ✅
+                - **> 5%**: Requer atenção ⚠️ (considere re-treinar o modelo)
+                """)
+        
+        else:
+            st.error(f"❌ Erro ao buscar dados de monitoramento: Status {response.status_code}")
+            st.info("Certifique-se de que a API está rodando e acessível.")
+    
+    except requests.exceptions.ConnectionError:
+        st.error("❌ Não foi possível conectar à API. Verifique se ela está rodando.")
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Timeout ao buscar dados. A API pode estar lenta.")
+    except Exception as e:
+        st.error(f"❌ Erro inesperado: {e}")
 
 
 # Footer
