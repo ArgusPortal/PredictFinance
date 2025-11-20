@@ -18,6 +18,13 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 
+# Importar API v8 para busca em tempo real
+try:
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
+    API_V8_DISPONIVEL = True
+except ImportError:
+    API_V8_DISPONIVEL = False
+
 # Carregar variáveis de ambiente
 load_dotenv()
 
@@ -116,12 +123,15 @@ with st.sidebar:
 
 def buscar_dados_historicos(ticker: str, period: str = "1y", use_cache: bool = True):
     """
-    Busca dados históricos do banco SQLite via API ou fallback para yfinance
+    Busca dados históricos com estratégia em cascata (FUNCIONALIDADE REAL):
+    1º Yahoo Finance API v8 Direta (demonstra integração real)
+    2º yfinance biblioteca oficial (fallback)
+    3º SQLite via API (último recurso offline)
     
     Args:
         ticker: Símbolo da ação (ex: B3SA3.SA)
         period: Período (1mo, 3mo, 6mo, 1y, 2y, 5y)
-        use_cache: Se True, tenta buscar do banco via API primeiro
+        use_cache: Se True, permite usar cache SQLite como último recurso
     
     Returns:
         DataFrame com dados OHLCV ou None
@@ -140,7 +150,35 @@ def buscar_dados_historicos(ticker: str, period: str = "1y", use_cache: bool = T
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
-    # Tentar buscar do banco via API primeiro
+    # ====== ESTRATÉGIA 1: Yahoo Finance API v8 Direta (PRIORITÁRIO) ======
+    if API_V8_DISPONIVEL:
+        try:
+            df = coletar_dados_yahoo_v8_custom_range(
+                ticker=ticker,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d")
+            )
+            
+            if not df.empty:
+                st.success(f"✅ **FONTE: Yahoo Finance API v8** | {len(df)} registros (tempo real)")
+                return df
+                
+        except Exception as e:
+            st.warning(f"⚠️ API v8 falhou: {str(e)[:80]}")
+    
+    # ====== ESTRATÉGIA 2: yfinance biblioteca oficial (fallback) ======
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=period)
+        
+        if not df.empty:
+            st.success(f"✅ **FONTE: yfinance biblioteca** | {len(df)} registros")
+            return df
+            
+    except Exception as e:
+        st.warning(f"⚠️ yfinance falhou: {str(e)[:80]}")
+    
+    # ====== ESTRATÉGIA 3: SQLite via API (último recurso) ======
     if use_cache:
         try:
             response = requests.get(
@@ -164,26 +202,15 @@ def buscar_dados_historicos(ticker: str, period: str = "1y", use_cache: bool = T
                     # Renomear colunas para match yfinance
                     df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
                     
-                    st.info(f"📊 Dados obtidos do cache SQLite ({data['count']} registros)")
+                    st.info(f"📦 **FONTE: Cache SQLite** | {data['count']} registros (fallback offline)")
                     return df
                     
         except Exception as e:
-            st.warning(f"⚠️ Cache SQLite indisponível, usando Yahoo Finance: {str(e)}")
+            st.error(f"❌ Cache SQLite também falhou: {str(e)[:80]}")
     
-    # Fallback para yfinance
-    try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period=period)
-        
-        if not df.empty:
-            st.info(f"📡 Dados obtidos do Yahoo Finance ({len(df)} registros)")
-            return df
-        else:
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ Erro ao buscar dados: {str(e)}")
-        return None
+    # Tudo falhou
+    st.error("❌ Todas as fontes de dados falharam (API v8, yfinance, SQLite)")
+    return None
 
 
 # ============================================================
@@ -566,9 +593,10 @@ elif page == "🎯 Métricas do Modelo":
                 
                 with col1:
                     mape = metricas_teste.get('MAPE', {})
+                    valor_mape = mape.get('valor', None)
                     st.metric(
                         "MAPE",
-                        mape.get('valor', 'N/A'),
+                        f"{valor_mape}" if valor_mape is not None else "—",
                         help=mape.get('descricao', '')
                     )
                     if 'interpretacao' in mape:
@@ -576,9 +604,10 @@ elif page == "🎯 Métricas do Modelo":
                 
                 with col2:
                     r2 = metricas_teste.get('R2', {})
+                    valor_r2 = r2.get('valor', None)
                     st.metric(
                         "R² Score",
-                        r2.get('valor', 'N/A'),
+                        f"{valor_r2}" if valor_r2 is not None else "—",
                         help=r2.get('descricao', '')
                     )
                     if 'interpretacao' in r2:
@@ -586,17 +615,19 @@ elif page == "🎯 Métricas do Modelo":
                 
                 with col3:
                     mae = metricas_teste.get('MAE', {})
+                    valor_mae = mae.get('valor', None)
                     st.metric(
                         "MAE",
-                        mae.get('valor', 'N/A'),
+                        f"{valor_mae}" if valor_mae is not None else "—",
                         help=mae.get('descricao', '')
                     )
                 
                 with col4:
                     rmse = metricas_teste.get('RMSE', {})
+                    valor_rmse = rmse.get('valor', None)
                     st.metric(
                         "RMSE",
-                        rmse.get('valor', 'N/A'),
+                        f"{valor_rmse}" if valor_rmse is not None else "—",
                         help=rmse.get('descricao', '')
                     )
                 
@@ -1933,7 +1964,7 @@ elif page == "🔍 Monitoramento":
                         help="Erro Percentual Absoluto Médio em produção"
                     )
                 else:
-                    st.metric("MAPE Produção", "N/A", help="Sem dados validados ainda")
+                    st.metric("MAPE Produção", "—", help="Sem dados validados ainda")
             
             with col4:
                 mae = stats.get('mae')
@@ -1944,7 +1975,7 @@ elif page == "🔍 Monitoramento":
                         help="Erro Absoluto Médio em reais"
                     )
                 else:
-                    st.metric("MAE Produção", "N/A", help="Sem dados validados ainda")
+                    st.metric("MAE Produção", "—", help="Sem dados validados ainda")
             
             st.markdown("---")
             
@@ -2090,8 +2121,8 @@ elif page == "🔍 Monitoramento":
                     
                     # Formatar colunas
                     df_display = pd.DataFrame({
-                        'ID': [p.get('request_id', 'N/A')[:8] for p in filtered_preds],
-                        'Data/Hora': [pd.to_datetime(p.get('timestamp')).strftime('%Y-%m-%d %H:%M') if p.get('timestamp') else 'N/A' for p in filtered_preds],
+                        'ID': [p.get('request_id', '')[:8] if p.get('request_id') else '—' for p in filtered_preds],
+                        'Data/Hora': [pd.to_datetime(p.get('timestamp')).strftime('%Y-%m-%d %H:%M') if p.get('timestamp') else '—' for p in filtered_preds],
                         'Previsto (R$)': [f"{p.get('predicted', 0):.2f}" for p in filtered_preds],
                         'Real (R$)': [f"{p.get('actual', 0):.2f}" if p.get('actual') else '⏳ Pendente' for p in filtered_preds],
                         'Erro (%)': [f"{p.get('error_pct', 0):.2f}%" if p.get('error_pct') is not None else '⏳' for p in filtered_preds],
@@ -2148,13 +2179,24 @@ elif page == "🔍 Monitoramento":
                                 val_result = val_response.json()
                                 validation = val_result.get('validation_result', {})
                                 
-                                st.success("✅ Validação concluída!")
+                                validated = validation.get('validated', 0)
+                                skipped = validation.get('skipped_future', 0)
+                                pending = validation.get('pending', 0)
                                 
-                                col_a, col_b = st.columns(2)
+                                if validated > 0:
+                                    st.success(f"✅ Validação concluída! {validated} previsões validadas")
+                                elif skipped > 0:
+                                    st.info(f"⏭️ {skipped} previsões aguardando dados reais (muito recentes)")
+                                else:
+                                    st.warning("⚠️ Nenhuma previsão pôde ser validada")
+                                
+                                col_a, col_b, col_c = st.columns(3)
                                 with col_a:
-                                    st.metric("Validadas", validation.get('validated', 0))
+                                    st.metric("✅ Validadas", validated)
                                 with col_b:
-                                    st.metric("Pendentes", validation.get('pending', 0))
+                                    st.metric("⏭️ Aguardando", skipped)
+                                with col_c:
+                                    st.metric("⏳ Pendentes", pending)
                                 
                                 if val_result.get('degradation_detected'):
                                     st.error("⚠️ **ALERTA**: Degradação do modelo detectada! Considere re-treinar o modelo.")
@@ -2438,11 +2480,11 @@ elif page == "🔍 Monitoramento":
                 summary_data = {
                     "Métrica": ["Total Validado", "Total Pendente", "MAPE", "MAE", "RMSE"],
                     "Valor": [
-                        stats.get('total_validated', 0),
-                        stats.get('total_pending', 0),
-                        f"{stats.get('mape', 0):.2f}%" if stats.get('mape') else "N/A",
-                        f"R$ {stats.get('mae', 0):.2f}" if stats.get('mae') else "N/A",
-                        f"R$ {stats.get('rmse', 0):.2f}" if stats.get('rmse') else "N/A"
+                        str(stats.get('total_validated', 0)),
+                        str(stats.get('total_pending', 0)),
+                        f"{stats.get('mape', 0):.2f}%" if stats.get('mape') else "—",
+                        f"R$ {stats.get('mae', 0):.2f}" if stats.get('mae') else "—",
+                        f"R$ {stats.get('rmse', 0):.2f}" if stats.get('rmse') else "—"
                     ]
                 }
                 

@@ -79,7 +79,8 @@ class PredictionLogger:
         input_data: List[List[float]],
         prediction: float,
         processing_time_ms: float,
-        request_id: str = None
+        request_id: str = None,
+        data_source: str = None
     ) -> str:
         """
         Registra uma previsão do modelo.
@@ -89,6 +90,7 @@ class PredictionLogger:
             prediction: Valor previsto
             processing_time_ms: Tempo de processamento em ms
             request_id: ID da requisição (gerado se não fornecido)
+            data_source: Fonte dos dados (ex: "Yahoo Finance API v8", "yfinance", "SQLite Cache")
         
         Returns:
             ID da requisição
@@ -115,6 +117,7 @@ class PredictionLogger:
             "request_id": request_id,
             "timestamp": datetime.now().isoformat(),
             "event": "prediction",
+            "data_source": data_source or "unknown",
             "input_stats": stats,
             "prediction": float(prediction),
             "processing_time_ms": float(processing_time_ms),

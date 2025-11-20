@@ -522,8 +522,8 @@ async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutp
         # Validar e normalizar ticker
         ticker = validar_ticker_format(previsao_input.ticker)
         
-        # Buscar dados históricos do Yahoo Finance
-        dados_array, df_original = buscar_dados_historicos(
+        # Buscar dados históricos do Yahoo Finance (retorna fonte também)
+        dados_array, df_original, data_source = buscar_dados_historicos(
             ticker=ticker,
             dias=WINDOW_SIZE,
             validar=True
@@ -581,7 +581,8 @@ async def fazer_previsao_auto(previsao_input: PrevisaoAutoInput) -> PrevisaoOutp
         request_id = pred_logger.log_prediction(
             input_data=input_for_log,
             prediction=valor_previsto,
-            processing_time_ms=processing_time
+            processing_time_ms=processing_time,
+            data_source=data_source  # Adicionar fonte dos dados
         )
         
         # Registrar previsão no sistema de monitoramento (Fase 12)

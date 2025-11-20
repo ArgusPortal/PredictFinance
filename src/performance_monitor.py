@@ -14,6 +14,13 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from collections import deque
 
+# Importar API v8 para busca de dados reais
+try:
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
+    API_V8_DISPONIVEL = True
+except ImportError:
+    API_V8_DISPONIVEL = False
+
 
 # Diretórios
 ROOT_DIR = Path(__file__).parent.parent
@@ -145,18 +152,50 @@ class PerformanceMonitor:
         start_date = end_date - timedelta(days=days_back + 5)  # Margem de segurança
         
         print(f"📈 Baixando dados reais de {self.ticker}...")
-        try:
-            data = yf.download(
-                self.ticker,
-                start=start_date,
-                end=end_date,
-                progress=False
-            )
-        except Exception as e:
-            print(f"❌ Erro ao baixar dados: {e}")
-            return {"error": str(e)}
+        data = None
+        
+        # Estratégia 1: API v8 (prioridade)
+        if API_V8_DISPONIVEL:
+            try:
+                print(f"   🔄 Tentando Yahoo Finance API v8...")
+                df = coletar_dados_yahoo_v8_custom_range(
+                    ticker=self.ticker,
+                    start_date=start_date.strftime("%Y-%m-%d"),
+                    end_date=end_date.strftime("%Y-%m-%d")
+                )
+                if not df.empty:
+                    data = df
+                    print(f"   ✅ API v8: {len(data)} registros")
+            except Exception as e:
+                print(f"   ⚠️ API v8 falhou: {str(e)[:80]}")
+        
+        # Estratégia 2: yfinance (fallback)
+        if data is None or data.empty:
+            try:
+                print(f"   🔄 Tentando yfinance...")
+                data = yf.download(
+                    self.ticker,
+                    start=start_date,
+                    end=end_date,
+                    progress=False
+                )
+                if not data.empty:
+                    print(f"   ✅ yfinance: {len(data)} registros")
+            except Exception as e:
+                print(f"   ❌ yfinance falhou: {str(e)[:80]}")
+        
+        # Validar se conseguiu dados
+        if data is None or data.empty:
+            error_msg = f"Não foi possível obter dados reais para validação"
+            print(f"❌ {error_msg}")
+            return {
+                "error": error_msg,
+                "validated": 0,
+                "pending": len(unvalidated)
+            }
         
         validated_count = 0
+        skipped_future = 0
         
         # Valida cada previsão
         for prediction in unvalidated:
@@ -164,6 +203,11 @@ class PerformanceMonitor:
             
             # Busca preço real do dia seguinte
             next_day = pred_date + timedelta(days=1)
+            
+            # Verificar se já passou tempo suficiente
+            if next_day > datetime.now():
+                skipped_future += 1
+                continue  # Pular previsões muito recentes
             
             # Tenta encontrar o preço real
             actual_value = None
@@ -198,7 +242,9 @@ class PerformanceMonitor:
         self._save_predictions_db()
         
         print(f"\n✅ Validadas: {validated_count} previsões")
-        print(f"⏳ Pendentes: {len(unvalidated) - validated_count}")
+        if skipped_future > 0:
+            print(f"⏭️  Ignoradas: {skipped_future} previsões muito recentes (aguardando dia seguinte)")
+        print(f"⏳ Pendentes: {len(unvalidated) - validated_count - skipped_future}")
         
         # Calcula métricas se houver validações
         if validated_count > 0:
@@ -206,7 +252,9 @@ class PerformanceMonitor:
         
         return {
             "validated": validated_count,
-            "pending": len(unvalidated) - validated_count
+            "skipped_future": skipped_future,
+            "pending": len(unvalidated) - validated_count - skipped_future,
+            "message": f"Validadas {validated_count}, {skipped_future} aguardando dados reais"
         }
     
     def calculate_metrics(self) -> Dict:

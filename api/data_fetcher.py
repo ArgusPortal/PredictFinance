@@ -22,6 +22,13 @@ try:
 except ImportError:
     DB_DISPONIVEL = False
 
+# Importar API v8 (prioridade sobre yfinance)
+try:
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
+    API_V8_DISPONIVEL = True
+except ImportError:
+    API_V8_DISPONIVEL = False
+
 # Importar dados de fallback (último recurso)
 try:
     from api.fallback_data import get_dados_exemplo, usar_fallback_disponivel
@@ -37,9 +44,12 @@ def buscar_dados_historicos(
     ticker: str,
     dias: int = 60,
     validar: bool = True
-) -> Tuple[np.ndarray, pd.DataFrame]:
+) -> Tuple[np.ndarray, pd.DataFrame, str]:
     """
-    Busca dados históricos OHLCV do Yahoo Finance.
+    Busca dados históricos OHLCV com estratégia em cascata (FUNCIONALIDADE REAL):
+    1º Yahoo Finance API v8 Direta (demonstra integração real)
+    2º yfinance biblioteca oficial (fallback confiável)
+    3º SQLite cache local (último recurso se APIs falharem)
     
     Args:
         ticker: Símbolo do ticker (ex: 'B3SA3.SA')
@@ -49,7 +59,8 @@ def buscar_dados_historicos(
     Returns:
         Tuple contendo:
         - numpy array shape (dias, 5) com [Open, High, Low, Close, Volume]
-        - DataFrame original do yfinance para referência
+        - DataFrame original para referência
+        - str com identificação da fonte (ex: "Yahoo Finance API v8")
         
     Raises:
         HTTPException: Se ticker inválido ou dados insuficientes
@@ -57,25 +68,43 @@ def buscar_dados_historicos(
     try:
         logger.info(f"📥 Iniciando busca: ticker={ticker}, dias={dias}")
         
-        # Buscar com margem extra para compensar fins de semana/feriados
-        # Pedir ~90 dias para garantir 60 dias úteis
+        # Calcular período com margem para fins de semana/feriados
         data_fim = datetime.now()
         data_inicio = data_fim - timedelta(days=dias * 2)
         
         logger.info(f"📅 Período: {data_inicio.date()} até {data_fim.date()}")
         
-        # Download dos dados com retry limitado
+        # ====== ESTRATÉGIA 1: Yahoo Finance API v8 Direta (PRIORITÁRIO) ======
+        if API_V8_DISPONIVEL:
+            logger.info(f"🔄 [1/3] Tentando Yahoo Finance API v8 direta...")
+            try:
+                df = coletar_dados_yahoo_v8_custom_range(
+                    ticker=ticker,
+                    start_date=data_inicio.strftime("%Y-%m-%d"),
+                    end_date=data_fim.strftime("%Y-%m-%d")
+                )
+                
+                if not df.empty and len(df) >= dias:
+                    fonte = "Yahoo Finance API v8"
+                    logger.info(f"✅ FONTE: {fonte} | {len(df)} registros brutos → {dias} processados")
+                    # Processar DataFrame para formato esperado
+                    dados_processados, df_retorno = processar_dataframe(df, dias, ticker)
+                    return dados_processados, df_retorno, fonte
+                else:
+                    logger.warning(f"⚠️ API v8: dados insuficientes ({len(df)}/{dias})")
+            
+            except Exception as e:
+                logger.error(f"❌ API v8 falhou: {str(e)[:100]}")
+        
+        # ====== ESTRATÉGIA 2: yfinance (fallback confiável) ======
+        logger.info(f"🔄 [2/3] Tentando yfinance biblioteca oficial...")
         max_tentativas = 3
-        ultimo_erro = None
         df = pd.DataFrame()
         
         for tentativa in range(max_tentativas):
-            logger.info(f"🔄 Tentativa {tentativa + 1}/{max_tentativas}")
+            logger.info(f"   Tentativa {tentativa + 1}/{max_tentativas}")
             try:
-                # Criar ticker com timeout maior
                 ticker_obj = yf.Ticker(ticker)
-                
-                # Tentar buscar dados
                 df = ticker_obj.history(
                     start=data_inicio,
                     end=data_fim,
@@ -84,120 +113,129 @@ def buscar_dados_historicos(
                     timeout=30
                 )
                 
-                # Se conseguiu dados, sair do loop
                 if not df.empty:
-                    logger.info(f"✅ Dados obtidos: {len(df)} registros")
+                    fonte = "yfinance"
+                    logger.info(f"✅ FONTE: {fonte} | {len(df)} registros brutos")
                     break
                 
-                # Se vazio mas sem erro, tentar novamente
-                logger.warning(f"⚠️ DataFrame vazio na tentativa {tentativa + 1}")
-                ultimo_erro = f"DataFrame vazio na tentativa {tentativa + 1}"
+                logger.warning(f"⚠️ yfinance: DataFrame vazio")
                 
             except Exception as e:
-                logger.error(f"❌ Erro na tentativa {tentativa + 1}: {str(e)[:100]}")
-                ultimo_erro = str(e)
-                # Só aguardar se não for a última tentativa
+                logger.error(f"❌ yfinance tentativa {tentativa + 1}: {str(e)[:100]}")
                 if tentativa < max_tentativas - 1:
-                    time.sleep(2 ** (tentativa + 1))  # 2, 4, 8 segundos
+                    time.sleep(2 ** (tentativa + 1))
         
-        # Validações
-        if df.empty:
-            logger.warning(f"⚠️ Yahoo Finance falhou completamente após {max_tentativas} tentativas")
-            
-            # ESTRATÉGIA DE FALLBACK:
-            # 1º: Tentar SQLite Database (preferido)
-            # 2º: Usar dados hardcoded (último recurso)
-            
-            # Fallback 1: SQLite Database
-            if DB_DISPONIVEL:
-                logger.info(f"🔄 Tentando buscar do banco SQLite...")
-                try:
-                    db = get_db()
-                    dados_db, df_db = db.get_data(ticker, dias=dias)
-                    
-                    if dados_db is not None:
-                        logger.info(f"✅ Dados recuperados do SQLite: {len(dados_db)} dias")
-                        return dados_db, df_db
-                    else:
-                        logger.warning(f"⚠️ SQLite não tem dados suficientes para {ticker}")
+        # ====== ESTRATÉGIA 3: SQLite Database (fallback offline) ======
+        if df.empty and DB_DISPONIVEL:
+            logger.info(f"🔄 [3/3] Tentando cache SQLite (fallback offline)...")
+            try:
+                db = get_db()
+                dados_db, df_db = db.get_data(ticker, dias=dias)
                 
-                except Exception as e:
-                    logger.error(f"❌ Erro ao buscar do SQLite: {e}")
+                if dados_db is not None and len(dados_db) >= dias:
+                    fonte = "SQLite Cache"
+                    logger.info(f"✅ FONTE: {fonte} | {len(dados_db)} registros")
+                    return dados_db, df_db, fonte
+                else:
+                    logger.warning(f"⚠️ SQLite: dados insuficientes ({len(dados_db) if dados_db is not None else 0}/{dias})")
             
-            # Fallback 2: Dados hardcoded (último recurso)
+            except Exception as e:
+                logger.error(f"❌ SQLite falhou: {str(e)[:100]}")
+        
+            except Exception as e:
+                logger.error(f"❌ SQLite falhou: {str(e)[:100]}")
+        
+        # ====== VALIDAÇÃO FINAL ======
+        if df.empty:
+            # Fallback hardcoded (último recurso extremo)
             if FALLBACK_DISPONIVEL and ticker.upper() == "B3SA3.SA" and dias == 60:
-                logger.warning(f"🔄 Usando dados de fallback hardcoded para {ticker}")
+                logger.warning(f"🔄 Usando fallback hardcoded (dados de exemplo)")
                 try:
                     dados_fallback = get_dados_exemplo(ticker, dias)
-                    # Criar DataFrame mock para retorno
                     df_fallback = pd.DataFrame(
                         dados_fallback,
                         columns=['Open', 'High', 'Low', 'Close', 'Volume']
                     )
-                    logger.info(f"✅ Fallback hardcoded: {len(df_fallback)} dias de dados")
-                    return dados_fallback, df_fallback
+                    fonte = "Fallback Hardcoded"
+                    logger.info(f"✅ FONTE: {fonte} | {len(df_fallback)} registros")
+                    return dados_fallback, df_fallback, fonte
                 except Exception as e:
-                    logger.error(f"❌ Erro ao usar fallback hardcoded: {e}")
+                    logger.error(f"❌ Fallback falhou: {e}")
             
-            # Se tudo falhar
+            # Tudo falhou
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Dados temporariamente indisponíveis para '{ticker}'. "
-                       f"Yahoo Finance bloqueado e fallbacks não disponíveis. "
-                       f"Tente novamente em alguns minutos ou popule o banco SQLite: "
-                       f"python database/populate_db.py --ticker {ticker}"
+                       f"Todas estratégias falharam (API v8, yfinance, SQLite). "
+                       f"Tente: python database/populate_db.py --ticker {ticker}"
             )
         
-        if len(df) < dias:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Dados insuficientes para '{ticker}'. "
-                       f"Necessário: {dias} dias, Disponível: {len(df)} dias"
-            )
-        
-        # Selecionar últimos N dias e features necessárias
-        df_recente = df.tail(dias).copy()
-        
-        # Garantir que temos todas as colunas necessárias
-        colunas_necessarias = ['Open', 'High', 'Low', 'Close', 'Volume']
-        if not all(col in df_recente.columns for col in colunas_necessarias):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Dados incompletos para '{ticker}'. "
-                       f"Colunas esperadas: {colunas_necessarias}"
-            )
-        
-        # Extrair array numpy no formato correto [Open, High, Low, Close, Volume]
-        dados_array = df_recente[colunas_necessarias].values
-        
-        # Validar que não há valores nulos
-        if np.isnan(dados_array).any():
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Dados contêm valores nulos para '{ticker}'"
-            )
-        
-        # Validar que valores são positivos (exceto volume que pode ser 0)
-        if (dados_array[:, :4] <= 0).any():  # Primeiras 4 colunas (OHLC)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Dados contêm valores inválidos (≤0) para '{ticker}'"
-            )
-        
-        return dados_array, df_recente
+        # Processar DataFrame (vindo de yfinance)
+        dados_processados, df_retorno = processar_dataframe(df, dias, ticker)
+        return dados_processados, df_retorno, fonte
         
     except HTTPException:
-        # Re-raise HTTPException
         raise
         
     except Exception as e:
-        # Capturar outros erros (rede, timeout, etc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Erro ao buscar dados para '{ticker}': {str(e)}"
         )
 
 
+def processar_dataframe(df: pd.DataFrame, dias: int, ticker: str) -> Tuple[np.ndarray, pd.DataFrame]:
+    """
+    Processa DataFrame bruto para formato esperado pela API.
+    
+    Args:
+        df: DataFrame com dados OHLCV
+        dias: Número mínimo de dias esperados
+        ticker: Símbolo do ticker (para mensagens de erro)
+    
+    Returns:
+        Tuple (numpy array, DataFrame processado)
+    
+    Raises:
+        HTTPException: Se dados insuficientes ou inválidos
+    """
+    if len(df) < dias:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Dados insuficientes para '{ticker}'. "
+                   f"Necessário: {dias} dias, Disponível: {len(df)} dias"
+        )
+    
+    # Selecionar últimos N dias
+    df_recente = df.tail(dias).copy()
+    
+    # Garantir colunas necessárias
+    colunas_necessarias = ['Open', 'High', 'Low', 'Close', 'Volume']
+    if not all(col in df_recente.columns for col in colunas_necessarias):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Dados incompletos para '{ticker}'. "
+                   f"Colunas esperadas: {colunas_necessarias}"
+        )
+    
+    # Extrair array numpy [Open, High, Low, Close, Volume]
+    dados_array = df_recente[colunas_necessarias].values
+    
+    # Validar valores não-nulos
+    if np.isnan(dados_array).any():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Dados contêm valores nulos para '{ticker}'"
+        )
+    
+    # Validar valores positivos (OHLC > 0)
+    if (dados_array[:, :4] <= 0).any():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Dados contêm valores inválidos (≤0) para '{ticker}'"
+        )
+    
+    return dados_array, df_recente
 def formatar_dados_para_modelo(
     dados: np.ndarray,
     window_size: int = 60
