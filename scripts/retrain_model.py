@@ -32,7 +32,8 @@ from src.data_preparation import (
     dividir_dados,
     salvar_dados_preparados
 )
-from src.model_training import construir_modelo_lstm, treinar_modelo
+from src.model_builder import construir_modelo_lstm
+from src.model_training import treinar_modelo
 
 
 def calcular_metricas(y_true, y_pred):
@@ -217,8 +218,9 @@ def main():
         
         # 4. Construir e treinar modelo
         print("\n🧠 ETAPA 4: Treinando novo modelo LSTM...")
-        input_shape = (X_train.shape[1], X_train.shape[2])
-        modelo = construir_modelo_lstm(input_shape)
+        timesteps = X_train.shape[1]  # 60
+        num_features = X_train.shape[2]  # 5
+        modelo = construir_modelo_lstm(timesteps=timesteps, features=num_features)
         
         historico, modelo_treinado = treinar_modelo(
             modelo,
