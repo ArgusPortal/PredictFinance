@@ -114,8 +114,8 @@ jobs:
               labels: ['automated', 'retrain', 'urgent']
             })
       
-      # 7. Upload de artefatos (logs)
-      - name: 📤 Upload logs
+      # 7. Upload de artefatos (logs e métricas se existirem)
+      - name: 📤 Upload artefatos
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -123,6 +123,7 @@ jobs:
           path: |
             models/model_metrics.json
             models/backups/
+          if-no-files-found: ignore
           retention-days: 30
 
 # Permissões necessárias

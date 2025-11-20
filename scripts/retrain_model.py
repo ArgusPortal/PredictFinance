@@ -25,7 +25,7 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Imports do projeto
-from src.data_collection import coletar_dados_yahoo
+from src.data_collection import coletar_dados_historicos
 from src.data_preparation import preparar_dados_lstm
 from src.model_training import construir_modelo_lstm, treinar_modelo
 
@@ -152,12 +152,15 @@ def main():
     try:
         # 1. Coletar dados atualizados
         print("\n📥 ETAPA 1: Coletando dados atualizados...")
-        df = coletar_dados_yahoo(
+        df = coletar_dados_historicos(
             ticker=args.ticker,
-            years=args.years,
-            save_path=raw_dir / f"{args.ticker}_atualizado.csv"
+            anos=args.years
         )
-        print(f"✅ {len(df)} dias de dados coletados")
+        
+        # Salvar dados coletados
+        raw_file = raw_dir / f"{args.ticker}_atualizado.csv"
+        df.to_csv(raw_file)
+        print(f"✅ {len(df)} dias de dados coletados e salvos em {raw_file}")
         
         # 2. Preparar dados
         print("\n🔧 ETAPA 2: Preparando dados para LSTM...")
