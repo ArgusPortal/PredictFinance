@@ -138,6 +138,36 @@ from src.model_training import treinar_modelo, configurar_callbacks
 
 ---
 
+### 5. ❌ FileNotFoundError: scaler.pkl
+**Erro:** `FileNotFoundError: [Errno 2] No such file or directory: 'data/processed/scaler.pkl'`
+
+**Causa:** Tentativa de recarregar scaler de local errado - `salvar_dados_preparados()` salva em `models/scaler.pkl`, não em `data/processed/`.
+
+**Solução Aplicada:**
+```python
+# ❌ Antes
+import joblib
+scaler = joblib.load(processed_dir / "scaler.pkl")  # Caminho errado!
+
+# ✅ Depois
+# scaler já está disponível da etapa 2, não precisa recarregar
+# salvar_dados_preparados(dados_divididos, scaler) salva em models/scaler.pkl
+```
+
+**Também corrigido:**
+```python
+# ❌ Antes (tentava copiar de local inexistente)
+shutil.copy2(processed_dir / "scaler.pkl", models_dir / "scaler.pkl")
+
+# ✅ Depois (scaler já está em models/scaler.pkl)
+# Scaler já foi salvo em models/scaler.pkl pela função salvar_dados_preparados
+print("   ✅ Scaler já disponível em models/scaler.pkl")
+```
+
+**Commit:** TBD
+
+---
+
 ## 📋 Checklist de Validação
 
 ### Imports Corretos ✅
@@ -320,11 +350,12 @@ Todos os logs salvos em: `.github/workflows/weekly_retrain.yml`
 
 ## ✅ Status Final
 
-**Todos os 4 erros corrigidos:**
+**Todos os 5 erros corrigidos:**
 1. ✅ Import `coletar_dados_yahoo` → `coletar_dados_historicos`
 2. ✅ Import `preparar_dados_lstm` → pipeline granular
 3. ✅ Parâmetros `construir_modelo_lstm` → int separados
 4. ✅ Parâmetros `treinar_modelo` → dict dados + callbacks
+5. ✅ Caminho `scaler.pkl` → usar variável local, scaler salvo em models/
 
 **Validações implementadas:**
 - ✅ Script `validate_retrain.py` com 5 tipos de validação
@@ -366,4 +397,4 @@ Se ainda houver erros:
 ---
 
 **Última atualização:** 2025-11-20  
-**Commits de correção:** df0689a, 7205c0e, 6729655, 5105821
+**Commits de correção:** df0689a, 7205c0e, 6729655, 5105821, [PRÓXIMO]

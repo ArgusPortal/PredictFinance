@@ -258,10 +258,7 @@ def main():
         modelo_treinado = load_model(model_path)
         y_pred = modelo_treinado.predict(X_test, verbose=0)
         
-        # Desnormalizar previsões
-        import joblib
-        scaler = joblib.load(processed_dir / "scaler.pkl")
-        
+        # Desnormalizar previsões (scaler já disponível da etapa 2)
         # Criar array dummy para desnormalizar apenas Close
         dummy_train = np.zeros((len(y_test), 5))
         dummy_train[:, 3] = y_test.flatten()
@@ -318,7 +315,9 @@ def main():
         final_model = models_dir / "lstm_model_best.h5"
         
         shutil.copy2(temp_model, final_model)
-        shutil.copy2(processed_dir / "scaler.pkl", models_dir / "scaler.pkl")
+        # Scaler já foi salvo em models/scaler.pkl pela função salvar_dados_preparados
+        print("   ✅ Modelo copiado")
+        print("   ✅ Scaler já disponível em models/scaler.pkl")
         
         # Salvar métricas
         salvar_metricas(metricas_novas, models_dir)
