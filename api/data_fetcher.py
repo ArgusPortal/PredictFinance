@@ -8,11 +8,22 @@ para uso nos endpoints de previsão automática.
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 import time
+import logging
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from fastapi import HTTPException, status
+
+# Importar dados de fallback
+try:
+    from api.fallback_data import get_dados_exemplo, usar_fallback_disponivel
+    FALLBACK_DISPONIVEL = True
+except ImportError:
+    FALLBACK_DISPONIVEL = False
+
+# Configurar logging
+logger = logging.getLogger(__name__)
 
 
 def buscar_dados_historicos(
@@ -37,46 +48,74 @@ def buscar_dados_historicos(
         HTTPException: Se ticker inválido ou dados insuficientes
     """
     try:
+        logger.info(f"📥 Iniciando busca: ticker={ticker}, dias={dias}")
+        
         # Buscar com margem extra para compensar fins de semana/feriados
         # Pedir ~90 dias para garantir 60 dias úteis
         data_fim = datetime.now()
         data_inicio = data_fim - timedelta(days=dias * 2)
         
-        # Configurar sessão do yfinance com headers apropriados
-        # Isso ajuda a evitar bloqueios do Yahoo Finance
+        logger.info(f"📅 Período: {data_inicio.date()} até {data_fim.date()}")
         
-        # Download dos dados com retry
+        # Download dos dados com retry limitado
         max_tentativas = 3
-        tentativa = 0
+        ultimo_erro = None
         df = pd.DataFrame()
         
-        while tentativa < max_tentativas and df.empty:
+        for tentativa in range(max_tentativas):
+            logger.info(f"🔄 Tentativa {tentativa + 1}/{max_tentativas}")
             try:
+                # Criar ticker com timeout maior
                 ticker_obj = yf.Ticker(ticker)
+                
+                # Tentar buscar dados
                 df = ticker_obj.history(
                     start=data_inicio,
                     end=data_fim,
                     interval='1d',
-                    auto_adjust=False,  # Manter dados originais sem ajustes
-                    timeout=30  # Aumentar timeout para 30 segundos
+                    auto_adjust=False,
+                    timeout=30
                 )
                 
+                # Se conseguiu dados, sair do loop
                 if not df.empty:
+                    logger.info(f"✅ Dados obtidos: {len(df)} registros")
                     break
-                    
+                
+                # Se vazio mas sem erro, tentar novamente
+                logger.warning(f"⚠️ DataFrame vazio na tentativa {tentativa + 1}")
+                ultimo_erro = f"DataFrame vazio na tentativa {tentativa + 1}"
+                
             except Exception as e:
-                tentativa += 1
-                if tentativa < max_tentativas:
-                    # Aguardar antes de tentar novamente (backoff exponencial)
-                    time.sleep(2 ** tentativa)
-                else:
-                    raise Exception(f"Falha após {max_tentativas} tentativas: {str(e)}")
+                logger.error(f"❌ Erro na tentativa {tentativa + 1}: {str(e)[:100]}")
+                ultimo_erro = str(e)
+                # Só aguardar se não for a última tentativa
+                if tentativa < max_tentativas - 1:
+                    time.sleep(2 ** (tentativa + 1))  # 2, 4, 8 segundos
         
         # Validações
         if df.empty:
+            # Tentar usar dados de fallback antes de falhar
+            if FALLBACK_DISPONIVEL and ticker.upper() == "B3SA3.SA" and dias == 60:
+                logger.warning(f"Yahoo Finance falhou, usando dados de fallback para {ticker}")
+                try:
+                    dados_fallback = get_dados_exemplo(ticker, dias)
+                    # Criar DataFrame mock para retorno
+                    df_fallback = pd.DataFrame(
+                        dados_fallback,
+                        columns=['Open', 'High', 'Low', 'Close', 'Volume']
+                    )
+                    logger.info(f"✅ Fallback: {len(df_fallback)} dias de dados")
+                    return dados_fallback, df_fallback
+                except Exception as e:
+                    logger.error(f"Erro ao usar fallback: {e}")
+            
+            # Se fallback também falhar ou não disponível
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Ticker '{ticker}' não encontrado ou sem dados disponíveis"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Yahoo Finance temporariamente indisponível para '{ticker}'. "
+                       f"Tentativas: {max_tentativas}. Último erro: {ultimo_erro}. "
+                       f"Tente novamente em alguns minutos."
             )
         
         if len(df) < dias:
