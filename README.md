@@ -150,7 +150,8 @@ PredictFinance/
 ├── tests/                # Testes unitários
 ├── requirements.txt      # Dependências do projeto
 ├── .env.example         # Exemplo de variáveis de ambiente
-├── Dockerfile           # Containerização da aplicação
+├── scripts/             # Scripts auxiliares (retrain, validação)
+├── monitoring/          # Dados de monitoramento (JSONs)
 └── README.md            # Este arquivo
 ```
 
@@ -240,12 +241,22 @@ PredictFinance/
 - **Saída**: Banco populado (1468 registros, 284 KB), workflows automatizados
 - 📖 **[Ver Guia Completo](docs/DATABASE_GUIDE.md)**
 
-### **Fase 11: Deploy Completo** 🔄
+### **Fase 11: Deploy Completo** ✅
 - **API**: Render.com (FastAPI + LSTM + SQLite)
 - **Frontend**: Streamlit Cloud (Interface web)
 - Workflows GitHub Actions (retrain semanal + update DB diário)
 - Monitoramento e logs em produção
 - 📖 **[Deploy API](DEPLOY_QUICKSTART.md)** | **[Deploy Streamlit](docs/DEPLOY_STREAMLIT.md)**
+
+### **Fase 12: Sistema de Monitoramento Completo** ✅
+- Dashboard de Performance no Streamlit (4 tabs)
+- Tab Performance: Métricas, gráficos de evolução, previsões recentes, validação manual
+- Tab Drift Detection: Monitoramento de mudanças na distribuição dos dados
+- Tab Alertas: Sistema de notificações com thresholds configuráveis
+- Tab Relatórios: Exportação de dados (CSV/JSON) com filtros de período
+- Integração com API `/monitoring/performance` e `/monitoring/validate`
+- **Saída**: Interface completa de observabilidade com 4 seções interativas
+- 📖 **[Ver Documentação](docs/MONITORING_SYSTEM.md)** | **[Quick Start](MONITORING_QUICKSTART.md)**
 
 ---
 
@@ -279,12 +290,19 @@ PredictFinance/
 - `uvicorn` - Servidor ASGI
 - `pydantic` - Validação de dados
 - `python-dotenv` - Gerenciamento de variáveis de ambiente
+- `sqlite3` - Banco de dados integrado para cache
 
-#### Monitoramento (Fase 8)
+#### Interface e Visualização
+- `streamlit` - Framework para dashboards interativos
+- `plotly` - Gráficos interativos avançados
+- `altair` - Visualizações declarativas
+
+#### Monitoramento (Fases 8 e 12)
 - `evidently` - Drift detection e model monitoring
 - `scipy` - Testes estatísticos (Kolmogorov-Smirnov)
-- `requests` - Alertas via Slack webhooks
+- `requests` - Integração com APIs e webhooks
 - `yfinance` - Coleta de valores reais para validação
+- Sistema completo de alertas e relatórios
 
 #### Testes e Qualidade
 - `pytest` - Testes unitários
@@ -326,28 +344,45 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### **4. Executar as Fases do Projeto**
+### **4. Configurar Banco de Dados SQLite**
 ```bash
-# Fase 1: Coleta de dados
-python src/data_collection.py
+# Popular banco com dados históricos (6 anos)
+python database/populate_db.py
 
-# Fase 2: Preparação de dados
-python src/data_preparation.py
-
-# Fase 3: Treinamento do modelo
-python src/model_training.py
-
-# Fase 4: Avaliação
-python src/model_evaluation.py
+# Verificar banco
+python database/db_manager.py
 ```
 
-### **5. Executar a API Localmente**
+### **5. Executar a Aplicação**
+
+#### Opção A: Usar Sistema Completo (API + Streamlit)
 ```bash
-cd api
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Terminal 1: API
+python run_api.py
+# Acesse: http://localhost:8000/docs
+
+# Terminal 2: Streamlit
+streamlit run app_streamlit.py
+# Acesse: http://localhost:8501
 ```
 
-Acesse a documentação interativa em: `http://localhost:8000/docs`
+#### Opção B: Treinar Modelo Localmente
+```bash
+# Pipeline completo de treinamento
+python -m src.data_collection
+python -m src.data_preparation  
+python -m src.model_training
+
+# Ou usar script de re-treino automatizado
+python scripts/retrain_model.py --dry-run
+```
+
+#### Opção C: Apenas API
+```bash
+python run_api.py
+# ou
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+```
 
 ---
 
@@ -362,17 +397,24 @@ O modelo será avaliado utilizando as seguintes métricas:
 
 ---
 
-## 🔄 Reutilização de Resultados
+## 🔄 Reutilização de Resultados e Fluxo de Dados
 
-Cada fase do projeto é construída sobre os resultados da fase anterior:
+Cada componente do sistema se integra com os demais:
 
-1. **Fase 1 → Fase 2**: Dados limpos são normalizados e transformados em sequências
-2. **Fase 2 → Fase 3**: Sequências preparadas alimentam o treinamento da LSTM
-3. **Fase 3 → Fase 4**: Modelo treinado é avaliado com dados de teste
-4. **Fase 4 → Fase 5**: Modelo validado é salvo para produção
-5. **Fase 5 → Fase 6**: Modelo salvo é carregado pela API
-6. **Fase 6 → Fase 7**: API local é containerizada e deployada
-7. **Fase 7 → Fase 8**: API em produção é monitorada continuamente
+1. **Yahoo Finance → SQLite**: Dados históricos coletados e armazenados em cache
+2. **SQLite → Preparação**: Dados do banco alimentam normalização e sequências
+3. **Sequências → Treinamento**: Pipeline de preparação gera dados para LSTM
+4. **Modelo Treinado → Persistência**: Modelo e scaler salvos em `models/`
+5. **Artefatos → API**: FastAPI carrega modelo para previsões em tempo real
+6. **API → Streamlit**: Interface consome endpoints para dashboards interativos
+7. **Previsões → Monitoramento**: Sistema valida previsões vs valores reais
+8. **Monitoramento → Alertas**: Degradação detectada dispara re-treino automático
+9. **GitHub Actions → Deploy**: Workflows atualizam banco e re-treinam modelo semanalmente
+
+**Automatizações Ativas:**
+- ⏰ **Diário (4h UTC)**: Atualização do banco SQLite com novos dados
+- ⏰ **Semanal (Segunda 3h UTC)**: Re-treino completo do modelo se métricas melhorarem
+- 🔍 **Contínuo**: Monitoramento de previsões e detecção de drift
 
 ---
 
@@ -423,6 +465,12 @@ Este projeto está sob a licença MIT. Veja o arquivo LICENSE para mais detalhes
 
 ---
 
-**Status do Projeto**: 🟢 Em Desenvolvimento Ativo
+**Status do Projeto**: 🟢 Produção (v2.0)
 
-**Última Atualização**: 02/11/2025
+**Última Atualização**: 20/11/2025
+
+**Métricas Atuais do Modelo:**
+- MAPE: 2.49% (Excelente)
+- MAE: R$ 0.33
+- R²: 0.70
+- Último treino: 2025-11-20
