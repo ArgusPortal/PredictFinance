@@ -33,8 +33,8 @@ st.set_page_config(
 ROOT_DIR = Path(__file__).parent
 sys.path.append(str(ROOT_DIR))
 
-# Configurações da API
-API_BASE_URL = "http://localhost:8000"
+# Configurações da API - usa variável de ambiente ou localhost
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
 
 # CSS customizado
 st.markdown("""
