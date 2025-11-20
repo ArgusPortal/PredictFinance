@@ -1,0 +1,131 @@
+name: 🔄 Re-treino Semanal Automático
+
+# Quando executar:
+# - Toda segunda-feira às 3h da manhã (horário UTC)
+# - Manualmente via workflow_dispatch
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Segunda-feira 3h UTC = Domingo 23h ou Segunda 0h BRT
+  workflow_dispatch:  # Permite executar manualmente
+    inputs:
+      force:
+        description: 'Forçar substituição mesmo se métricas piores'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  retrain:
+    name: Re-treinar Modelo LSTM
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Timeout de 1 hora
+    
+    steps:
+      # 1. Checkout do código
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      # 2. Setup Python
+      - name: 🐍 Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      # 3. Instalar dependências
+      - name: 📦 Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      # 4. Executar re-treino
+      - name: 🧠 Executar re-treino
+        id: retrain
+        run: |
+          if [ "${{ github.event.inputs.force }}" == "true" ]; then
+            python scripts/retrain_model.py --force
+          else
+            python scripts/retrain_model.py
+          fi
+        continue-on-error: true
+      
+      # 5. Commit e push do novo modelo (se sucesso)
+      - name: 💾 Commit modelo atualizado
+        if: steps.retrain.outcome == 'success'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Adicionar apenas arquivos necessários
+          git add models/lstm_model_best.h5
+          git add models/scaler.pkl
+          git add models/model_metrics.json
+          
+          # Commit com timestamp
+          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S UTC')
+          git commit -m "🤖 Auto-retrain: Modelo atualizado - $TIMESTAMP
+
+          Executado via GitHub Actions
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}"
+          
+          git push
+      
+      # 6. Criar Issue se falhou
+      - name: 🚨 Criar Issue se falhou
+        if: steps.retrain.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Re-treino Automático FALHOU',
+              body: `## ❌ Falha no Re-treino Automático
+              
+              **Data/Hora:** ${new Date().toISOString()}
+              **Workflow:** ${context.workflow}
+              **Run ID:** ${context.runId}
+              **Commit:** ${context.sha.substring(0, 7)}
+              
+              ### 🔍 Detalhes
+              
+              O re-treino automático semanal falhou. Possíveis causas:
+              
+              - ❌ Erro ao buscar dados do Yahoo Finance
+              - ❌ Falha no treinamento do modelo
+              - ❌ Métricas do novo modelo piores que o atual
+              - ❌ Problema de memória ou timeout
+              
+              ### 🛠️ Ações Recomendadas
+              
+              1. Verificar logs do workflow: [Clique aqui](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+              2. Executar re-treino manualmente: \`python scripts/retrain_model.py --dry-run\`
+              3. Se necessário, forçar substituição: \`python scripts/retrain_model.py --force\`
+              
+              ### 📊 Estado Atual
+              
+              O modelo em produção permanece inalterado. A API continua funcionando normalmente.
+              
+              ---
+              *Este issue foi criado automaticamente pelo GitHub Actions*`,
+              labels: ['automated', 'retrain', 'urgent']
+            })
+      
+      # 7. Upload de artefatos (logs)
+      - name: 📤 Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrain-logs-${{ github.run_number }}
+          path: |
+            models/model_metrics.json
+            models/backups/
+          retention-days: 30
+
+# Permissões necessárias
+permissions:
+  contents: write  # Para fazer push do modelo
+  issues: write    # Para criar issues em caso de falha
