@@ -1,5 +1,8 @@
 # PredictFinance - Previsão de Preços de Ações B3SA3.SA com LSTM
 
+[![Streamlit App](https://img.shields.io/badge/Streamlit-Live%20Demo-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://predictfinance.streamlit.app/)
+[![API Docs](https://img.shields.io/badge/API-Swagger%20Docs-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](https://b3sa3-api.onrender.com/docs)
+
 ## 📋 Visão Geral do Projeto
 
 Este projeto desenvolve um modelo preditivo de preços das ações da B3 S.A. (código **B3SA3.SA**) utilizando redes neurais **LSTM (Long Short-Term Memory)**. O objetivo principal é prever o **preço de fechamento diário** da ação, métrica que reflete o consenso de valor ao final de cada pregão.
@@ -15,10 +18,27 @@ O projeto contempla desde a coleta e preparação de dados históricos até o de
 
 ---
 
+## 🌐 Aplicações em Produção
+
+### 🎨 Interface Streamlit
+**URL:** [https://predictfinance.streamlit.app/](https://predictfinance.streamlit.app/)
+
+Interface web interativa com dashboards completos para análise e previsão.
+
+### ⚡ API REST
+**URL:** [https://b3sa3-api.onrender.com/docs](https://b3sa3-api.onrender.com/docs)
+
+API FastAPI com documentação Swagger interativa para integração em sistemas.
+
+---
+
 ## 🚀 Uso Rápido
 
 ### 🖥️ Interface Streamlit (Recomendado)
 
+**🌐 Online:** [https://predictfinance.streamlit.app/](https://predictfinance.streamlit.app/)
+
+**💻 Local:**
 ```bash
 # Terminal 1: Iniciar API
 python run_api.py
