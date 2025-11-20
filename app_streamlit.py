@@ -111,6 +111,82 @@ with st.sidebar:
 
 
 # ============================================================
+# FUNÇÕES AUXILIARES
+# ============================================================
+
+def buscar_dados_historicos(ticker: str, period: str = "1y", use_cache: bool = True):
+    """
+    Busca dados históricos do banco SQLite via API ou fallback para yfinance
+    
+    Args:
+        ticker: Símbolo da ação (ex: B3SA3.SA)
+        period: Período (1mo, 3mo, 6mo, 1y, 2y, 5y)
+        use_cache: Se True, tenta buscar do banco via API primeiro
+    
+    Returns:
+        DataFrame com dados OHLCV ou None
+    """
+    # Mapear período para dias
+    period_days = {
+        "1mo": 30,
+        "3mo": 90,
+        "6mo": 180,
+        "1y": 365,
+        "2y": 730,
+        "5y": 1825
+    }
+    
+    days = period_days.get(period, 365)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # Tentar buscar do banco via API primeiro
+    if use_cache:
+        try:
+            response = requests.get(
+                f"{API_BASE_URL}/data/historical/{ticker}",
+                params={
+                    "start_date": start_date.strftime("%Y-%m-%d"),
+                    "end_date": end_date.strftime("%Y-%m-%d")
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('count', 0) > 0:
+                    # Converter para DataFrame
+                    df = pd.DataFrame(data['data'])
+                    df['date'] = pd.to_datetime(df['date'])
+                    df.set_index('date', inplace=True)
+                    
+                    # Renomear colunas para match yfinance
+                    df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+                    
+                    st.info(f"📊 Dados obtidos do cache SQLite ({data['count']} registros)")
+                    return df
+                    
+        except Exception as e:
+            st.warning(f"⚠️ Cache SQLite indisponível, usando Yahoo Finance: {str(e)}")
+    
+    # Fallback para yfinance
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period=period)
+        
+        if not df.empty:
+            st.info(f"📡 Dados obtidos do Yahoo Finance ({len(df)} registros)")
+            return df
+        else:
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao buscar dados: {str(e)}")
+        return None
+
+
+# ============================================================
 # PÁGINA: INÍCIO
 # ============================================================
 if page == "🏠 Início":
@@ -243,11 +319,10 @@ elif page == "📊 Análise Descritiva":
     if st.button("🔍 Buscar Dados", key="fetch_data"):
         with st.spinner("Buscando dados..."):
             try:
-                # Buscar dados do Yahoo Finance
-                stock = yf.Ticker(ticker)
-                df = stock.history(period=period)
+                # Buscar dados do cache SQLite ou Yahoo Finance
+                df = buscar_dados_historicos(ticker, period, use_cache=True)
                 
-                if df.empty:
+                if df is None or df.empty:
                     st.error(f"❌ Nenhum dado encontrado para {ticker}")
                 else:
                     st.success(f"✅ Dados carregados: {len(df)} registros")
@@ -1228,13 +1303,13 @@ elif page == "🔮 Previsão":
                                 # Buscar dados históricos para mostrar
                                 df_hist = None
                                 try:
-                                    stock = yf.Ticker(ticker_input)
-                                    df_hist = stock.history(period="60d")
+                                    # Usar função helper para buscar dados (cache SQLite ou Yahoo)
+                                    df_hist = buscar_dados_historicos(ticker_input, "3mo", use_cache=True)
                                     
-                                    if not df_hist.empty:
-                                        st.metric("Período", "Últimos 60 dias")
+                                    if df_hist is not None and not df_hist.empty:
+                                        st.metric("Período", f"Últimos {len(df_hist)} dias")
                                         st.metric("Último Preço Real", f"R$ {df_hist['Close'].iloc[-1]:.2f}")
-                                        st.metric("Variação (60d)", f"{((df_hist['Close'].iloc[-1] - df_hist['Close'].iloc[0]) / df_hist['Close'].iloc[0] * 100):.2f}%")
+                                        st.metric("Variação (período)", f"{((df_hist['Close'].iloc[-1] - df_hist['Close'].iloc[0]) / df_hist['Close'].iloc[0] * 100):.2f}%")
                                         
                                         # Mini gráfico
                                         fig = go.Figure()
@@ -1369,10 +1444,10 @@ elif page == "📈 Análise Técnica":
         
         with st.spinner("Analisando..."):
             try:
-                stock = yf.Ticker(ticker)
-                df = stock.history(period=period)
+                # Usar função helper para buscar dados (cache SQLite ou Yahoo)
+                df = buscar_dados_historicos(ticker, period, use_cache=True)
                 
-                if df.empty:
+                if df is None or df.empty:
                     st.error(f"❌ Nenhum dado encontrado para {ticker}")
                     st.session_state.technical_data = None
                 else:
