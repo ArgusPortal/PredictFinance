@@ -26,7 +26,12 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # Imports do projeto
 from src.data_collection import coletar_dados_historicos
-from src.data_preparation import preparar_dados_lstm
+from src.data_preparation import (
+    normalizar_dados,
+    criar_sequencias,
+    dividir_dados,
+    salvar_dados_preparados
+)
 from src.model_training import construir_modelo_lstm, treinar_modelo
 
 
@@ -162,26 +167,49 @@ def main():
         df.to_csv(raw_file)
         print(f"✅ {len(df)} dias de dados coletados e salvos em {raw_file}")
         
-        # 2. Preparar dados
+        # 2. Preparar dados para LSTM
         print("\n🔧 ETAPA 2: Preparando dados para LSTM...")
-        preparar_dados_lstm(
-            ticker=args.ticker,
-            raw_dir=str(raw_dir),
-            processed_dir=str(processed_dir),
-            window_size=60,
-            test_size=0.15,
-            val_size=0.15
+        
+        # Features a serem usadas
+        features = ['Open', 'High', 'Low', 'Close', 'Volume']
+        
+        # Normalizar dados
+        print("   📊 Normalizando dados...")
+        dados_normalizados, scaler = normalizar_dados(df, features)
+        
+        # Criar sequências
+        print("   🔨 Criando sequências temporais...")
+        close_idx = features.index('Close')
+        X, y = criar_sequencias(
+            dados=dados_normalizados,
+            timesteps=60,  # window_size
+            target_idx=close_idx
         )
-        print("✅ Dados preparados")
+        
+        # Dividir dados
+        print("   ✂️  Dividindo dados (70% treino, 15% val, 15% teste)...")
+        dados_divididos = dividir_dados(
+            X=X,
+            y=y,
+            train_pct=0.70,
+            val_pct=0.15,
+            test_pct=0.15
+        )
+        
+        # Salvar dados preparados
+        print("   💾 Salvando dados preparados...")
+        salvar_dados_preparados(dados_divididos, scaler)
+        
+        print("✅ Dados preparados com sucesso!")
         
         # 3. Carregar dados preparados
         print("\n📂 ETAPA 3: Carregando dados de treinamento...")
-        X_train = np.load(processed_dir / "X_train.npy")
-        y_train = np.load(processed_dir / "y_train.npy")
-        X_val = np.load(processed_dir / "X_val.npy")
-        y_val = np.load(processed_dir / "y_val.npy")
-        X_test = np.load(processed_dir / "X_test.npy")
-        y_test = np.load(processed_dir / "y_test.npy")
+        X_train = dados_divididos['X_train']
+        y_train = dados_divididos['y_train']
+        X_val = dados_divididos['X_val']
+        y_val = dados_divididos['y_val']
+        X_test = dados_divididos['X_test']
+        y_test = dados_divididos['y_test']
         
         print(f"   Treino: {X_train.shape[0]} sequências")
         print(f"   Validação: {X_val.shape[0]} sequências")
