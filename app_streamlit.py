@@ -818,42 +818,42 @@ elif page == "🎯 Métricas do Modelo":
                 fig = go.Figure()
                 
                 # Loss
-                    fig.add_trace(go.Scatter(
-                        x=epocas,
-                        y=hist['loss'],
-                        name='Loss Treino',
-                        line=dict(color='blue', width=2),
-                        mode='lines'
-                    ))
-                    
-                    fig.add_trace(go.Scatter(
-                        x=epocas,
-                        y=hist['val_loss'],
-                        name='Loss Validação',
-                        line=dict(color='orange', width=2),
-                        mode='lines'
-                    ))
-                    
-                    # Marcar melhor época
-                    best_epoch = treino.get('best_epoch', 0)
-                    if best_epoch > 0:
-                        fig.add_vline(
-                            x=best_epoch,
-                            line_dash="dash",
-                            line_color="green",
-                            annotation_text=f"Melhor Época: {best_epoch}",
-                            annotation_position="top"
-                        )
-                    
-                    fig.update_layout(
-                        title='Histórico Completo de Loss',
-                        xaxis_title='Época',
-                        yaxis_title='Loss (MSE)',
-                        height=400,
-                        hovermode='x unified'
+                fig.add_trace(go.Scatter(
+                    x=epocas,
+                    y=hist['loss'],
+                    name='Loss Treino',
+                    line=dict(color='blue', width=2),
+                    mode='lines'
+                ))
+                
+                fig.add_trace(go.Scatter(
+                    x=epocas,
+                    y=hist['val_loss'],
+                    name='Loss Validação',
+                    line=dict(color='orange', width=2),
+                    mode='lines'
+                ))
+                
+                # Marcar melhor época
+                best_epoch = treino.get('best_epoch', 0)
+                if best_epoch > 0:
+                    fig.add_vline(
+                        x=best_epoch,
+                        line_dash="dash",
+                        line_color="green",
+                        annotation_text=f"Melhor Época: {best_epoch}",
+                        annotation_position="top"
                     )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
+                
+                fig.update_layout(
+                    title='Histórico Completo de Loss',
+                    xaxis_title='Época',
+                    yaxis_title='Loss (MSE)',
+                    height=400,
+                    hovermode='x unified'
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
         
         else:
             st.warning("⚠️ Gráfico de curvas de aprendizado não encontrado. Execute `python src/model_training.py` para gerar.")
