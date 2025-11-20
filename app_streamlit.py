@@ -621,7 +621,16 @@ elif page == "🎯 Métricas do Modelo":
                     - **Caixa amarela:** Métricas de performance consolidadas para fácil referência.
                     """)
                 else:
-                    st.warning("⚠️ Gráfico de resultados não encontrado. Execute `python src/model_training.py` para gerar.")
+                    st.info("""
+                    📊 **Gráficos de Treinamento Disponíveis no README**
+                    
+                    As imagens de resultado do teste não estão incluídas no deploy para manter o repositório leve.
+                    
+                    Você pode:
+                    - Ver gráficos completos no [README do GitHub](https://github.com/ArgusPortal/PredictFinance)
+                    - Executar localmente: `python src/model_training.py` para gerar as imagens
+                    - Confiar nas métricas da API que são calculadas em tempo real
+                    """)
                 
                 st.markdown("---")
                 
@@ -751,9 +760,21 @@ elif page == "🎯 Métricas do Modelo":
               - ✅ Pouca diferença entre treino e validação
             """)
             
-            if training_data:
-                st.markdown("---")
-                st.markdown("#### 📊 Estatísticas de Treinamento")
+        else:
+            st.info("""
+            📈 **Curvas de Aprendizado Disponíveis no README**
+            
+            As imagens de curvas de treinamento não estão incluídas no deploy para manter o repositório leve.
+            
+            Você pode:
+            - Ver curvas completas no [README do GitHub](https://github.com/ArgusPortal/PredictFinance)
+            - Executar localmente: `python src/model_training.py` para gerar as imagens
+            - As estatísticas de treinamento estão disponíveis abaixo
+            """)
+        
+        if training_data:
+            st.markdown("---")
+            st.markdown("#### 📊 Estatísticas de Treinamento")
                 
                 treino = training_data.get('treinamento', {})
                 

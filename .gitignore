@@ -49,10 +49,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Documentação gerada
+# Documentação gerada (imagens pequenas são versionadas)
+# docs/training/*.png - REMOVIDO: imagens necessárias para Streamlit Cloud
 docs/data_collection/*.png
 docs/evaluation/*.png
-docs/training/*.png
 
 # Testes
 .pytest_cache/
