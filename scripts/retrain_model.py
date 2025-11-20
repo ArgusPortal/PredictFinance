@@ -35,6 +35,14 @@ from src.data_preparation import (
 from src.model_builder import construir_modelo_lstm, compilar_modelo
 from src.model_training import treinar_modelo, configurar_callbacks
 
+# Importar API v8 como alternativa
+try:
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8
+    API_V8_DISPONIVEL = True
+except ImportError:
+    API_V8_DISPONIVEL = False
+    print("⚠️  API v8 não disponível, usando apenas coletar_dados_historicos")
+
 
 def calcular_metricas(y_true, y_pred):
     """Calcula métricas de avaliação"""

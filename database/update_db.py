@@ -21,8 +21,12 @@ from pathlib import Path
 # Configurar encoding UTF-8 para Windows
 if sys.platform == 'win32':
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    if not hasattr(sys.stdout, 'buffer'):
+        # Já está configurado, não fazer nada
+        pass
+    else:
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 # Adiciona diretório raiz ao path
 ROOT_DIR = Path(__file__).parent.parent
@@ -32,6 +36,7 @@ try:
     import yfinance as yf
     import pandas as pd
     from database import get_db
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
 except ImportError as e:
     print(f"❌ Erro ao importar dependências: {e}")
     print("Execute: pip install yfinance pandas")
@@ -40,7 +45,8 @@ except ImportError as e:
 
 def buscar_dados_yahoo(ticker: str, start_date: str, end_date: str, max_tentativas: int = 3) -> pd.DataFrame:
     """
-    Busca dados do Yahoo Finance com retry e timeout aumentado.
+    Busca dados do Yahoo Finance usando API v8 como método primário.
+    Fallback para yfinance se API v8 falhar.
     
     Args:
         ticker: Símbolo da ação (ex: B3SA3.SA)
@@ -51,6 +57,25 @@ def buscar_dados_yahoo(ticker: str, start_date: str, end_date: str, max_tentativ
     Returns:
         DataFrame com dados OHLCV ou DataFrame vazio se falhar
     """
+    # Método 1: API v8 (mais rápido e confiável)
+    print(f"🚀 Tentando API v8 direta...")
+    try:
+        df = coletar_dados_yahoo_v8_custom_range(
+            ticker=ticker,
+            start_date=start_date,
+            end_date=end_date,
+            interval='1d'
+        )
+        
+        if not df.empty:
+            print(f"✅ API v8: {len(df)} registros obtidos")
+            # Garantir colunas consistentes
+            return df[['Open', 'High', 'Low', 'Close', 'Volume']]
+    except Exception as e:
+        print(f"⚠️  API v8 falhou: {str(e)}")
+        print(f"🔄 Usando yfinance como fallback...")
+    
+    # Método 2: yfinance (fallback)
     for tentativa in range(1, max_tentativas + 1):
         try:
             print(f"🔄 Tentativa {tentativa}/{max_tentativas} - Buscando dados de {start_date} a {end_date}...")
@@ -64,7 +89,7 @@ def buscar_dados_yahoo(ticker: str, start_date: str, end_date: str, max_tentativ
             )
             
             if not df.empty:
-                print(f"✅ Dados obtidos com sucesso: {len(df)} registros")
+                print(f"✅ yfinance: {len(df)} registros obtidos")
                 return df[['Open', 'High', 'Low', 'Close', 'Volume']]
             else:
                 print(f"⚠️  Nenhum dado retornado para {ticker} (tentativa {tentativa})")
@@ -77,7 +102,7 @@ def buscar_dados_yahoo(ticker: str, start_date: str, end_date: str, max_tentativ
                 print(f"⏳ Aguardando {tempo_espera}s antes da próxima tentativa...")
                 time.sleep(tempo_espera)
     
-    print(f"❌ Falha após {max_tentativas} tentativas")
+    print(f"❌ Falha após {max_tentativas} tentativas (ambos os métodos)")
     return pd.DataFrame()
 
 

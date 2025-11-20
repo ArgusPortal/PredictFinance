@@ -56,7 +56,8 @@ sns.set_palette("husl")
 
 def coletar_dados_historicos(ticker: str, anos: int) -> pd.DataFrame:
     """
-    Coleta dados históricos do Yahoo Finance.
+    Coleta dados históricos usando estratégia híbrida.
+    Prioridade: SQLite → API v8 → yfinance
     
     Parâmetros:
     -----------
@@ -82,8 +83,37 @@ def coletar_dados_historicos(ticker: str, anos: int) -> pd.DataFrame:
     print(f"   Início: {data_inicio.strftime('%Y-%m-%d')}")
     print(f"   Fim:    {data_fim.strftime('%Y-%m-%d')}\n")
     
-    print(f"📡 Conectando ao Yahoo Finance...")
+    # Método 1: Tentar SQLite primeiro (mais rápido)
+    try:
+        from database.db_manager import DatabaseManager
+        print(f"💾 Tentando SQLite...")
+        db = DatabaseManager()
+        dados = db.get_data(
+            ticker=ticker,
+            start_date=data_inicio.strftime('%Y-%m-%d'),
+            end_date=data_fim.strftime('%Y-%m-%d')
+        )
+        if not dados.empty:
+            print(f"✅ SQLite: {len(dados)} registros")
+            print(f"   Período: {dados.index[0].strftime('%Y-%m-%d')} a {dados.index[-1].strftime('%Y-%m-%d')}\n")
+            return dados
+    except Exception as e:
+        print(f"⚠️  SQLite não disponível: {str(e)}")
     
+    # Método 2: API v8 (mais confiável que yfinance)
+    try:
+        from src.yahoo_finance_v8 import coletar_dados_yahoo_v8
+        print(f"🚀 Tentando API v8...")
+        dados = coletar_dados_yahoo_v8(ticker, period=f"{anos}y")
+        if not dados.empty:
+            print(f"✅ API v8: {len(dados)} registros")
+            print(f"   Período: {dados.index[0].strftime('%Y-%m-%d')} a {dados.index[-1].strftime('%Y-%m-%d')}\n")
+            return dados
+    except Exception as e:
+        print(f"⚠️  API v8 falhou: {str(e)}")
+    
+    # Método 3: yfinance (fallback final)
+    print(f"📡 Usando yfinance (fallback)...")
     try:
         # Download dos dados
         dados = yf.download(
@@ -100,15 +130,14 @@ def coletar_dados_historicos(ticker: str, anos: int) -> pd.DataFrame:
         if dados.empty:
             raise ValueError(f"Nenhum dado encontrado para {ticker}")
         
-        print(f"✅ Dados coletados com sucesso!")
-        print(f"   Total de registros: {len(dados)}")
-        print(f"   Período efetivo: {dados.index[0].strftime('%Y-%m-%d')} a {dados.index[-1].strftime('%Y-%m-%d')}\n")
+        print(f"✅ yfinance: {len(dados)} registros")
+        print(f"   Período: {dados.index[0].strftime('%Y-%m-%d')} a {dados.index[-1].strftime('%Y-%m-%d')}\n")
         
         return dados
         
     except Exception as e:
-        print(f"❌ Erro ao coletar dados: {str(e)}")
-        raise
+        print(f"❌ Todas as fontes falharam: {str(e)}")
+        raise ValueError(f"Não foi possível coletar dados de {ticker} por nenhum método")
 
 
 def analisar_dados_faltantes(df: pd.DataFrame) -> Dict:

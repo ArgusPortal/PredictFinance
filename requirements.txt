@@ -7,9 +7,10 @@
 # --------------------
 
 # Coleta e Manipulação de Dados
-yfinance>=0.2.32
+yfinance>=0.2.48  # Versão atualizada (nov 2024)
 pandas>=1.5.3,<2.1.0
 numpy>=1.23.5,<1.25.0
+requests>=2.31.0  # Para API v8 direta
 
 # Machine Learning e Deep Learning
 tensorflow>=2.10.0,<2.16.0
@@ -42,7 +43,7 @@ google-generativeai>=0.8.5
 
 # Utilitários
 tqdm>=4.65.0
-requests>=2.31.0
+# requests>=2.31.0  # Movido para seção Coleta de Dados
 
 # Testes
 pytest>=7.4.0
