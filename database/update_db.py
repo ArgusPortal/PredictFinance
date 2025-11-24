@@ -201,7 +201,7 @@ def atualizar_ticker(ticker: str) -> bool:
         print(f"\n📊 Estatísticas atualizadas:")
         print(f"   Total de registros: {stats['total_records']}")
         print(f"   Data mais antiga: {stats['oldest_date']}")
-        print(f"   Data mais recente: {stats['latest_date']}")
+        print(f"   Data mais recente: {stats['newest_date']}")
         
         return True
         
