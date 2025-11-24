@@ -20,6 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60  # Timeout de 1 hora
     
+    permissions:
+      contents: write  # Para fazer push do modelo
+      issues: write    # Para criar issues em caso de falha
+    
     steps:
       # 1. Checkout do código
       - name: 📥 Checkout código
@@ -125,8 +129,3 @@ jobs:
             models/backups/
           if-no-files-found: ignore
           retention-days: 30
-
-# Permissões necessárias
-permissions:
-  contents: write  # Para fazer push do modelo
-  issues: write    # Para criar issues em caso de falha

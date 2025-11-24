@@ -19,6 +19,9 @@ jobs:
   update-database:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write  # Necessário para fazer push
+    
     steps:
     - name: Checkout código
       uses: actions/checkout@v4
