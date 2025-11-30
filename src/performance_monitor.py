@@ -194,8 +194,18 @@ class PerformanceMonitor:
                 "pending": len(unvalidated)
             }
         
+        # CORREÇÃO: Normalizar índice do DataFrame para comparação correta
+        # O índice pode ter timezone e/ou horário (ex: '2025-11-21 13:00:00')
+        # Precisamos normalizar para apenas data (ex: '2025-11-21')
+        if hasattr(data.index, 'tz') and data.index.tz is not None:
+            data.index = data.index.tz_localize(None)
+        data.index = pd.to_datetime(data.index).normalize()
+        
+        print(f"   📅 Datas disponíveis: {data.index[0].date()} a {data.index[-1].date()}")
+        
         validated_count = 0
         skipped_future = 0
+        not_found = 0
         
         # Valida cada previsão
         for prediction in unvalidated:
@@ -203,20 +213,23 @@ class PerformanceMonitor:
             
             # Busca preço real do dia seguinte
             next_day = pred_date + timedelta(days=1)
+            next_day_normalized = pd.Timestamp(next_day.date())  # Apenas data, sem horário
             
             # Verificar se já passou tempo suficiente
-            if next_day > datetime.now():
+            today_normalized = pd.Timestamp(datetime.now().date())
+            if next_day_normalized > today_normalized:
                 skipped_future += 1
                 continue  # Pular previsões muito recentes
             
             # Tenta encontrar o preço real
             actual_value = None
-            for offset in range(5):  # Procura até 5 dias à frente (fins de semana)
-                check_date = next_day + timedelta(days=offset)
-                date_str = check_date.strftime('%Y-%m-%d')
+            found_date = None
+            for offset in range(5):  # Procura até 5 dias à frente (fins de semana/feriados)
+                check_date = next_day_normalized + timedelta(days=offset)
                 
-                if date_str in data.index.astype(str):
-                    actual_value = float(data.loc[date_str, 'Close'])
+                if check_date in data.index:
+                    actual_value = float(data.loc[check_date, 'Close'])
+                    found_date = check_date
                     break
             
             if actual_value is not None:
@@ -237,6 +250,9 @@ class PerformanceMonitor:
                       f"Previsto={prediction['predicted_value']:.2f}, "
                       f"Real={actual_value:.2f}, "
                       f"Erro={error_pct:.2f}%")
+            else:
+                not_found += 1
+                print(f"   ⚠️  {prediction['request_id'][:8]}: Dados reais não encontrados para {next_day.date()}")
         
         # Salva atualizações
         self._save_predictions_db()
@@ -244,6 +260,8 @@ class PerformanceMonitor:
         print(f"\n✅ Validadas: {validated_count} previsões")
         if skipped_future > 0:
             print(f"⏭️  Ignoradas: {skipped_future} previsões muito recentes (aguardando dia seguinte)")
+        if not_found > 0:
+            print(f"⚠️  Sem dados: {not_found} previsões (dados de mercado não disponíveis)")
         print(f"⏳ Pendentes: {len(unvalidated) - validated_count - skipped_future}")
         
         # Calcula métricas se houver validações
@@ -253,6 +271,7 @@ class PerformanceMonitor:
         return {
             "validated": validated_count,
             "skipped_future": skipped_future,
+            "not_found": not_found,
             "pending": len(unvalidated) - validated_count - skipped_future,
             "message": f"Validadas {validated_count}, {skipped_future} aguardando dados reais"
         }
