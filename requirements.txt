@@ -65,3 +65,6 @@ gunicorn>=21.2.0  # Para produção
 jupyter>=1.0.0
 ipykernel>=6.25.0
 notebook>=6.5.4,<7.1.0
+ 
+# PostgreSQL driver (for Render DB persistence)
+psycopg2-binary>=2.9.6

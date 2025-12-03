@@ -11,3 +11,5 @@ services:
         value: 3.10.11
       - key: PORT
         value: 10000
+      - key: DATABASE_URL
+        value: postgresql://predictfinance_user:1V7ZFkk17XF1EWeSP8osSJVqpvlqygGE@dpg-d4o5o4ur433s73enkogg-a.ohio-postgres.render.com/predictfinance

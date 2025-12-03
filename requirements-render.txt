@@ -33,4 +33,7 @@ joblib==1.5.2
 # HTTP Client (para testes)
 requests==2.31.0
 
+# Database (PostgreSQL/Supabase para persistência em produção)
+psycopg2-binary==2.9.9
+
 # Python 3.10+ required

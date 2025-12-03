@@ -3,6 +3,11 @@ Sistema de Monitoramento de Performance do Modelo em Produção
 
 Compara previsões realizadas com valores reais obtidos posteriormente.
 Calcula métricas de erro (MAE, MAPE) e detecta degradação do modelo.
+
+IMPORTANTE: Hierarquia de persistência:
+1. PostgreSQL Render (produção na nuvem - persistente)
+2. SQLite local (fallback se PostgreSQL não disponível)
+3. JSON local (backup adicional)
 """
 
 import json
@@ -21,6 +26,15 @@ try:
 except ImportError:
     API_V8_DISPONIVEL = False
 
+# Importar banco de dados (suporta PostgreSQL + SQLite)
+try:
+    from database.db_manager import get_db
+    DB_DISPONIVEL = True
+except ImportError:
+    DB_DISPONIVEL = False
+    def get_db():
+        return None
+
 
 # Diretórios
 ROOT_DIR = Path(__file__).parent.parent
@@ -28,7 +42,7 @@ LOGS_DIR = ROOT_DIR / "logs"
 MONITORING_DIR = ROOT_DIR / "monitoring"
 MONITORING_DIR.mkdir(exist_ok=True)
 
-# Arquivo para armazenar previsões aguardando validação
+# Arquivo para armazenar previsões aguardando validação (fallback local)
 PREDICTIONS_DB = MONITORING_DIR / "predictions_tracking.json"
 PERFORMANCE_METRICS = MONITORING_DIR / "performance_metrics.json"
 
@@ -43,6 +57,9 @@ class PerformanceMonitor:
     - Calcula métricas de erro (MAE, MAPE, RMSE)
     - Mantém histórico de performance
     - Detecta degradação do modelo
+    
+    IMPORTANTE: O db_manager.py já suporta PostgreSQL (quando DATABASE_URL está definida)
+    com fallback automático para SQLite local.
     """
     
     def __init__(self, ticker: str = "B3SA3.SA", window_days: int = 7):
@@ -55,25 +72,92 @@ class PerformanceMonitor:
         """
         self.ticker = ticker
         self.window_days = window_days
+        
+        # Inicializar banco de dados (PostgreSQL ou SQLite - gerenciado pelo db_manager)
+        self.db = None
+        if DB_DISPONIVEL:
+            try:
+                self.db = get_db()
+                if self.db and getattr(self.db, 'pg_enabled', False):
+                    print("☁️ Usando PostgreSQL Render para persistência")
+                elif self.db:
+                    print("💾 Usando SQLite local para persistência")
+            except Exception as e:
+                print(f"⚠️ Banco de dados não disponível: {e}")
+        
+        # Carregar dados
         self.predictions_db = self._load_predictions_db()
         self.metrics_history = self._load_metrics_history()
     
     def _load_predictions_db(self) -> Dict:
         """
         Carrega banco de previsões aguardando validação.
+        Hierarquia: Banco de dados (PostgreSQL/SQLite) > JSON local.
         
         Returns:
             Dicionário com previsões
         """
+        # Prioridade 1: Banco de dados (PostgreSQL ou SQLite via db_manager)
+        if self.db is not None:
+            try:
+                predictions = self.db.get_predictions(ticker=self.ticker, limit=500)
+                if predictions:
+                    db_type = "PostgreSQL" if getattr(self.db, 'pg_enabled', False) else "SQLite"
+                    print(f"📊 Carregadas {len(predictions)} previsões do {db_type}")
+                    return {"predictions": predictions}
+            except Exception as e:
+                print(f"⚠️ Erro ao carregar do banco: {e}")
+        
+        # Prioridade 2: Arquivo JSON local (fallback)
         if PREDICTIONS_DB.exists():
             with open(PREDICTIONS_DB, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                print(f"📁 Carregadas {len(data.get('predictions', []))} previsões do JSON local")
+                return data
+        
+        print("📭 Nenhuma previsão encontrada")
         return {"predictions": []}
     
     def _save_predictions_db(self):
-        """Salva banco de previsões."""
-        with open(PREDICTIONS_DB, 'w', encoding='utf-8') as f:
-            json.dump(self.predictions_db, f, indent=2, ensure_ascii=False)
+        """
+        Salva banco de previsões.
+        JSON local é mantido como backup adicional.
+        """
+        # Sempre salva no JSON local como backup
+        try:
+            with open(PREDICTIONS_DB, 'w', encoding='utf-8') as f:
+                json.dump(self.predictions_db, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"⚠️ Erro ao salvar JSON local: {e}")
+    
+    def _save_prediction_to_db(self, prediction_entry: Dict) -> bool:
+        """
+        Salva uma previsão no banco de dados (PostgreSQL ou SQLite).
+        
+        Args:
+            prediction_entry: Dicionário com dados da previsão
+        
+        Returns:
+            True se salvo com sucesso
+        """
+        if self.db is None:
+            return False
+        
+        try:
+            saved = self.db.insert_prediction(
+                request_id=prediction_entry.get("request_id", ""),
+                ticker=self.ticker,
+                timestamp=prediction_entry.get("timestamp", ""),
+                predicted_value=prediction_entry.get("predicted_value", 0.0)
+            )
+            if saved:
+                db_type = "PostgreSQL" if getattr(self.db, 'pg_enabled', False) else "SQLite"
+                print(f"✅ Previsão salva no {db_type}")
+                return True
+        except Exception as e:
+            print(f"⚠️ Erro ao salvar no banco: {e}")
+        
+        return False
     
     def _load_metrics_history(self) -> Dict:
         """
@@ -100,6 +184,7 @@ class PerformanceMonitor:
     ):
         """
         Registra uma previsão para validação futura.
+        Salva no SQLite (persistente) e JSON (backup local).
         
         Args:
             prediction_value: Valor previsto
@@ -118,6 +203,12 @@ class PerformanceMonitor:
             "error": None
         }
         
+        # Salvar no banco de dados SQLite (persistência em produção)
+        db_saved = self._save_prediction_to_db(prediction_entry)
+        if db_saved:
+            print(f"✅ Previsão {request_id[:8] if request_id else 'N/A'} salva no banco de dados")
+        
+        # Também salvar no JSON local (backup)
         self.predictions_db["predictions"].append(prediction_entry)
         self._save_predictions_db()
     
@@ -237,12 +328,29 @@ class PerformanceMonitor:
                 error = abs(prediction["predicted_value"] - actual_value)
                 error_pct = (error / actual_value) * 100
                 
-                # Atualiza previsão
+                # Atualiza previsão no dicionário
                 prediction["validated"] = True
                 prediction["actual_value"] = actual_value
                 prediction["error"] = error
                 prediction["error_pct"] = error_pct
                 prediction["validation_date"] = datetime.now().isoformat()
+                
+                # Atualiza no banco de dados (PostgreSQL ou SQLite)
+                request_id = prediction.get("request_id", "")
+                validation_date = prediction["validation_date"]
+                
+                # Atualizar no banco de dados
+                if self.db is not None:
+                    try:
+                        self.db.update_prediction_validation(
+                            request_id=request_id,
+                            actual_value=actual_value,
+                            error=error,
+                            error_pct=error_pct,
+                            validation_date=validation_date
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Erro ao validar no banco: {e}")
                 
                 validated_count += 1
                 
@@ -254,7 +362,7 @@ class PerformanceMonitor:
                 not_found += 1
                 print(f"   ⚠️  {prediction['request_id'][:8]}: Dados reais não encontrados para {next_day.date()}")
         
-        # Salva atualizações
+        # Salva atualizações no JSON (backup local)
         self._save_predictions_db()
         
         print(f"\n✅ Validadas: {validated_count} previsões")
