@@ -2203,8 +2203,12 @@ elif page == "🔍 Monitoramento":
                                 else:
                                     st.success("✅ Performance do modelo dentro do esperado.")
                                 
-                                # Recarregar página após validação
-                                st.rerun()
+                                # Mostrar botão para atualizar dados (ao invés de rerun automático)
+                                not_found = validation.get('not_found', 0)
+                                if not_found > 0:
+                                    st.warning(f"⚠️ {not_found} previsões sem dados de mercado disponíveis ainda")
+                                
+                                st.info("💡 Clique em 'Atualizar Dados' acima para ver as mudanças na tabela.")
                             else:
                                 st.error(f"Erro ao validar: {val_response.status_code}")
                         except Exception as e:
