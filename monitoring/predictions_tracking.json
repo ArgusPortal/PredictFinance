@@ -4,65 +4,81 @@
       "request_id": "41fb6dc0",
       "timestamp": "2025-11-20T18:29:54.206251",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.311105"
     },
     {
       "request_id": "7aae1938",
       "timestamp": "2025-11-20T18:30:25.234997",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.311105"
     },
     {
       "request_id": "7c08bc54",
       "timestamp": "2025-11-20T18:30:50.651499",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.311105"
     },
     {
       "request_id": "8dbd17d2",
       "timestamp": "2025-11-20T18:44:57.153139",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.312106"
     },
     {
       "request_id": "cc8a8167",
       "timestamp": "2025-11-20T18:47:00.494182",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.312106"
     },
     {
       "request_id": "a4b81068",
       "timestamp": "2025-11-20T18:56:14.384524",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.312106"
     },
     {
       "request_id": "dcdd6eed",
       "timestamp": "2025-11-20T18:57:01.949218",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.312106"
     },
     {
       "request_id": "bf5e404a",
       "timestamp": "2025-11-20T19:01:56.589390",
       "predicted_value": 13.908321418518653,
-      "validated": false,
-      "actual_value": null,
-      "error": null
+      "validated": true,
+      "actual_value": 13.890000343322754,
+      "error": 0.01832107519589954,
+      "error_pct": 0.13190118605509543,
+      "validation_date": "2025-11-30T16:13:50.312106"
     }
   ]
 }

@@ -1,0 +1,20 @@
+{
+  "daily_metrics": [
+    {
+      "timestamp": "2025-11-30T16:13:50.313105",
+      "window_days": 7,
+      "mae": 0.01832107519589954,
+      "mape": 0.1319011860550954,
+      "rmse": 0.01832107519589954,
+      "total_validated": 8,
+      "min_error_pct": 0.13190118605509543,
+      "max_error_pct": 0.13190118605509543
+    }
+  ],
+  "summary": {
+    "last_update": "2025-11-30T16:13:50.313105",
+    "current_mae": 0.01832107519589954,
+    "current_mape": 0.1319011860550954,
+    "total_predictions_validated": 8
+  }
+}

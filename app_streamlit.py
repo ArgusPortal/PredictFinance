@@ -2256,52 +2256,188 @@ elif page == "🔍 Monitoramento":
         potencialmente degradando a performance do modelo.
         """)
         
-        # Métricas de drift
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric(
-                "Checks de Drift",
-                "Em breve",
-                help="Total de verificações de drift realizadas"
-            )
-        
-        with col2:
-            st.metric(
-                "Drift Detectado",
-                "0",
-                help="Número de vezes que drift foi detectado"
-            )
-        
-        with col3:
-            st.metric(
-                "Taxa de Drift",
-                "0.0%",
-                help="Porcentagem de checks que detectaram drift"
-            )
-        
-        st.markdown("---")
-        
-        st.markdown("#### 📈 Como Funciona o Drift Detection")
-        
-        st.markdown("""
-        **Métodos de Detecção**:
-        1. **Mudança de Média**: Detecta shifts significativos na média dos preços
-        2. **Mudança de Desvio Padrão**: Identifica mudanças na volatilidade
-        3. **Teste de Kolmogorov-Smirnov**: Compara distribuições estatísticas
-        
-        **Thresholds**:
-        - Mudança de média > 10%
-        - Mudança de desvio > 20%
-        - p-value K-S < 0.05
-        
-        **Ação Recomendada ao Detectar Drift**:
-        - Re-treinar o modelo com dados mais recentes
-        - Revisar features utilizadas
-        - Atualizar estatísticas de referência
-        """)
-        
-        st.info("📊 Funcionalidade completa em desenvolvimento. Integração com drift detector em andamento.")
+        # Buscar dados de drift da API
+        try:
+            drift_response = requests.get(f"{API_BASE_URL}/monitoring/drift", timeout=10)
+            
+            if drift_response.status_code == 200:
+                drift_data = drift_response.json()
+                drift_summary = drift_data.get('summary', {})
+                reference_stats = drift_data.get('reference_statistics', {})
+                recent_reports = drift_data.get('recent_reports', [])
+                config = drift_data.get('configuration', {})
+                drift_status = drift_data.get('status', 'not_configured')
+                
+                # Status do sistema
+                if drift_status == 'active':
+                    st.success("✅ Sistema de Drift Detection **ATIVO**")
+                else:
+                    st.warning("⚠️ Sistema de Drift Detection **NÃO CONFIGURADO**")
+                
+                st.markdown("---")
+                
+                # Métricas de drift
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric(
+                        "Checks de Drift",
+                        drift_summary.get('total_checks', 0),
+                        help="Total de verificações de drift realizadas"
+                    )
+                
+                with col2:
+                    drift_count = drift_summary.get('drift_detected_count', 0)
+                    st.metric(
+                        "Drift Detectado",
+                        drift_count,
+                        delta="⚠️" if drift_count > 0 else None,
+                        help="Número de vezes que drift foi detectado"
+                    )
+                
+                with col3:
+                    drift_rate = drift_summary.get('drift_rate', 0.0)
+                    st.metric(
+                        "Taxa de Drift",
+                        f"{drift_rate:.1f}%",
+                        help="Porcentagem de checks que detectaram drift"
+                    )
+                
+                with col4:
+                    last_check = drift_summary.get('last_check_timestamp')
+                    if last_check:
+                        # Formatar data
+                        try:
+                            dt = datetime.fromisoformat(last_check.replace('Z', '+00:00'))
+                            last_check_str = dt.strftime("%d/%m %H:%M")
+                        except:
+                            last_check_str = last_check[:16]
+                    else:
+                        last_check_str = "N/A"
+                    st.metric(
+                        "Último Check",
+                        last_check_str,
+                        help="Data/hora da última verificação de drift"
+                    )
+                
+                st.markdown("---")
+                
+                # Estatísticas de Referência
+                if reference_stats:
+                    st.markdown("#### 📊 Estatísticas de Referência (Baseline)")
+                    
+                    ref_col1, ref_col2, ref_col3 = st.columns(3)
+                    
+                    with ref_col1:
+                        st.markdown(f"""
+                        **Dados de Treino:**
+                        - Amostras: **{reference_stats.get('n_samples', 'N/A')}**
+                        - Média: **{reference_stats.get('mean', 0):.4f}**
+                        - Mediana: **{reference_stats.get('median', 0):.4f}**
+                        """)
+                    
+                    with ref_col2:
+                        st.markdown(f"""
+                        **Dispersão:**
+                        - Desvio Padrão: **{reference_stats.get('std', 0):.4f}**
+                        - IQR: **{reference_stats.get('iqr', 0):.4f}**
+                        """)
+                    
+                    with ref_col3:
+                        st.markdown(f"""
+                        **Limites:**
+                        - Mínimo: **{reference_stats.get('min', 0):.4f}**
+                        - Máximo: **{reference_stats.get('max', 0):.4f}**
+                        """)
+                    
+                    # Data de configuração
+                    ref_timestamp = reference_stats.get('timestamp', '')
+                    if ref_timestamp:
+                        st.caption(f"📅 Referência configurada em: {ref_timestamp[:19]}")
+                
+                st.markdown("---")
+                
+                # Histórico de Relatórios
+                st.markdown("#### 📋 Histórico de Verificações")
+                
+                if recent_reports:
+                    for i, report in enumerate(reversed(recent_reports[-5:])):  # Últimos 5
+                        drift_detected = report.get('drift_detected', False)
+                        timestamp = report.get('timestamp', '')[:19]
+                        window_name = report.get('window_name', 'unknown')
+                        alerts = report.get('alerts', [])
+                        
+                        if drift_detected:
+                            with st.expander(f"⚠️ **{timestamp}** - {window_name} - DRIFT DETECTADO", expanded=(i==0)):
+                                st.error("Drift significativo detectado!")
+                                st.markdown("**Alertas:**")
+                                for alert in alerts:
+                                    st.markdown(f"- {alert}")
+                                
+                                # Comparações
+                                comparisons = report.get('comparisons', {})
+                                if comparisons:
+                                    st.markdown("**Comparações:**")
+                                    st.markdown(f"- Diferença de Média: **{comparisons.get('mean_diff_pct', 0):.2f}%**")
+                                    st.markdown(f"- Diferença de Desvio: **{comparisons.get('std_diff_pct', 0):.2f}%**")
+                        else:
+                            with st.expander(f"✅ **{timestamp}** - {window_name} - OK"):
+                                st.success("Nenhum drift significativo detectado")
+                else:
+                    st.info("📊 Nenhuma verificação de drift registrada ainda.")
+                
+                st.markdown("---")
+                
+                # Configuração
+                st.markdown("#### ⚙️ Configuração do Detector")
+                
+                cfg_col1, cfg_col2, cfg_col3 = st.columns(3)
+                
+                with cfg_col1:
+                    st.markdown(f"**Nível de Significância:** {config.get('significance_level', 0.05)}")
+                
+                with cfg_col2:
+                    st.markdown(f"**Threshold Média:** {config.get('mean_threshold_pct', 10)}%")
+                
+                with cfg_col3:
+                    st.markdown(f"**Threshold Desvio:** {config.get('std_threshold_pct', 20)}%")
+            
+            else:
+                st.error(f"❌ Erro ao buscar dados de drift: Status {drift_response.status_code}")
+                
+                # Fallback - mostrar informação estática
+                st.markdown("---")
+                st.markdown("#### 📈 Como Funciona o Drift Detection")
+                st.markdown("""
+                **Métodos de Detecção**:
+                1. **Mudança de Média**: Detecta shifts significativos na média dos preços
+                2. **Mudança de Desvio Padrão**: Identifica mudanças na volatilidade
+                3. **Teste de Kolmogorov-Smirnov**: Compara distribuições estatísticas
+                """)
+                
+        except requests.exceptions.RequestException as e:
+            st.warning(f"⚠️ Não foi possível conectar à API de drift: {str(e)[:50]}")
+            
+            # Mostrar informação estática como fallback
+            st.markdown("---")
+            st.markdown("#### 📈 Como Funciona o Drift Detection")
+            
+            st.markdown("""
+            **Métodos de Detecção**:
+            1. **Mudança de Média**: Detecta shifts significativos na média dos preços
+            2. **Mudança de Desvio Padrão**: Identifica mudanças na volatilidade
+            3. **Teste de Kolmogorov-Smirnov**: Compara distribuições estatísticas
+            
+            **Thresholds**:
+            - Mudança de média > 10%
+            - Mudança de desvio > 20%
+            - p-value K-S < 0.05
+            
+            **Ação Recomendada ao Detectar Drift**:
+            - Re-treinar o modelo com dados mais recentes
+            - Revisar features utilizadas
+            - Atualizar estatísticas de referência
+            """)
     
     # ============================================================
     # TAB 3: ALERTAS

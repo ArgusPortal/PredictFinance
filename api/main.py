@@ -913,6 +913,72 @@ async def obter_performance_producao(ticker: str = "B3SA3.SA") -> Dict[str, Any]
         )
 
 
+@app.get(
+    "/monitoring/drift",
+    summary="Status de Drift Detection",
+    description="Retorna estatísticas de referência e histórico de detecção de drift",
+    tags=["Monitoramento"]
+)
+async def get_drift_status() -> Dict[str, Any]:
+    """
+    Retorna status do sistema de detecção de drift.
+    
+    Returns:
+        Estatísticas de referência, relatórios de drift e resumo
+    """
+    import json
+    
+    try:
+        # Caminhos dos arquivos de drift
+        reference_path = ROOT_DIR / "monitoring" / "reference_statistics.json"
+        reports_path = ROOT_DIR / "monitoring" / "drift_reports.json"
+        
+        # Carregar estatísticas de referência
+        reference_stats = {}
+        if reference_path.exists():
+            with open(reference_path, 'r', encoding='utf-8') as f:
+                reference_stats = json.load(f)
+        
+        # Carregar relatórios de drift
+        drift_reports = {"reports": []}
+        if reports_path.exists():
+            with open(reports_path, 'r', encoding='utf-8') as f:
+                drift_reports = json.load(f)
+        
+        # Calcular resumo
+        reports = drift_reports.get("reports", [])
+        total_checks = len(reports)
+        drift_detected_count = sum(1 for r in reports if r.get("drift_detected", False))
+        drift_rate = (drift_detected_count / total_checks * 100) if total_checks > 0 else 0.0
+        
+        # Último check
+        last_check = reports[-1] if reports else None
+        
+        return {
+            "status": "active" if reference_stats else "not_configured",
+            "timestamp": datetime.now().isoformat(),
+            "reference_statistics": reference_stats,
+            "summary": {
+                "total_checks": total_checks,
+                "drift_detected_count": drift_detected_count,
+                "drift_rate": round(drift_rate, 2),
+                "last_check_timestamp": last_check.get("timestamp") if last_check else None,
+                "last_drift_detected": last_check.get("drift_detected") if last_check else None
+            },
+            "recent_reports": reports[-10:] if reports else [],  # Últimos 10 relatórios
+            "configuration": {
+                "significance_level": 0.05,
+                "mean_threshold_pct": 10,
+                "std_threshold_pct": 20
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter status de drift: {str(e)}"
+        )
+
+
 @app.post(
     "/monitoring/validate",
     summary="Validar Previsões Pendentes",
