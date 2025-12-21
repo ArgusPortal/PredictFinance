@@ -2259,10 +2259,27 @@ elif page == "🔍 Monitoramento":
         
         # Buscar dados de drift da API
         try:
+            # Debug: mostrar URL sendo acessada
+            with st.expander("🔍 Debug: Informações da Conexão", expanded=False):
+                st.code(f"API URL: {API_BASE_URL}/monitoring/drift")
+                st.caption(f"Timestamp: {datetime.now().isoformat()}")
+            
             drift_response = requests.get(f"{API_BASE_URL}/monitoring/drift", timeout=15)
+            
+            # Debug: mostrar status da resposta
+            with st.expander("🔍 Debug: Resposta da API", expanded=False):
+                st.code(f"Status Code: {drift_response.status_code}")
+                if drift_response.status_code == 200:
+                    st.json(drift_response.json())
             
             if drift_response.status_code == 200:
                 drift_data = drift_response.json()
+                
+                # Verificar se o endpoint retornou dados válidos
+                if not drift_data or not isinstance(drift_data, dict):
+                    st.error("❌ API retornou dados inválidos")
+                    st.stop()
+                
                 drift_status = drift_data.get('status', 'active')  # Assume ativo se não especificado
                 drift_detected = drift_data.get('drift_detected', False)
                 severity = drift_data.get('severity', 'none')
@@ -2273,6 +2290,14 @@ elif page == "🔍 Monitoramento":
                 config = drift_data.get('configuration', {})
                 summary = drift_data.get('summary', {})
                 recent_reports = drift_data.get('recent_reports', [])
+                cache_mode = drift_data.get('cache_mode', False)
+                
+                # Aviso se estiver usando cache
+                if cache_mode:
+                    st.info("ℹ️ **Modo Cache:** Yahoo Finance temporariamente indisponível. Exibindo últimos dados conhecidos.")
+                    cache_timestamp = drift_data.get('cache_timestamp', 'unknown')
+                    if cache_timestamp != 'unknown':
+                        st.caption(f"Última atualização: {cache_timestamp}")
                 
                 # Status do sistema com resultado atual
                 if drift_status == 'active':
@@ -2283,8 +2308,15 @@ elif page == "🔍 Monitoramento":
                             st.warning("⚠️ **Drift moderado detectado** - Monitorar situação")
                     else:
                         st.success("✅ **Mercado estável** - Sem drift significativo nos últimos 7 dias")
-                else:
+                elif drift_status == 'not_configured':
                     st.warning("⚠️ Sistema de Drift Detection **NÃO CONFIGURADO**")
+                    st.info("""Execute o script de setup para configurar:
+                    ```bash
+                    python setup_drift_detection.py
+                    ```
+                    """)
+                else:
+                    st.info(f"ℹ️ Status do sistema: {drift_status}")
                 
                 st.markdown("---")
                 

@@ -116,6 +116,55 @@
         "mean_threshold_pct": 5.0,
         "std_threshold_pct": 50.0
       }
+    },
+    {
+      "timestamp": "2025-12-21T19:07:18.847947",
+      "approach": "sliding_window",
+      "drift_detected": false,
+      "severity": "none",
+      "alerts": [],
+      "current_window": {
+        "period": "11/12 a 19/12",
+        "days": 7,
+        "stats": {
+          "n_samples": 7,
+          "mean": 13.814285823277064,
+          "std": 0.4823411382436546,
+          "min": 13.25,
+          "max": 14.40999984741211,
+          "median": 13.720000267028809,
+          "q1": 13.345000267028809,
+          "q3": 14.315000057220459,
+          "iqr": 0.9699997901916504
+        }
+      },
+      "reference_window": {
+        "period": "29/10 a 10/12",
+        "days": 30,
+        "stats": {
+          "n_samples": 30,
+          "mean": 13.917666721343995,
+          "std": 0.7725701125139668,
+          "min": 12.600000381469727,
+          "max": 15.100000381469727,
+          "median": 14.085000038146973,
+          "q1": 13.139999866485596,
+          "q3": 14.462500095367432,
+          "iqr": 1.322500228881836
+        }
+      },
+      "comparisons": {
+        "mean_diff_pct": 0.7428033745655563,
+        "std_diff_pct": 37.56668418428694,
+        "ks_test": {
+          "statistic": 0.3,
+          "p_value": 0.5766658391184007
+        }
+      },
+      "thresholds": {
+        "mean_threshold_pct": 5.0,
+        "std_threshold_pct": 50.0
+      }
     }
   ]
 }

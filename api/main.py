@@ -943,6 +943,61 @@ async def get_drift_status() -> Dict[str, Any]:
         df = yf.download("B3SA3.SA", start=start_date, end=end_date, progress=False)
         
         if df.empty:
+            # Fallback: tentar usar dados do arquivo drift_reports.json se existir
+            reports_path = ROOT_DIR / "monitoring" / "drift_reports.json"
+            if reports_path.exists():
+                try:
+                    with open(reports_path, 'r', encoding='utf-8') as f:
+                        drift_data = json.load(f)
+                        recent_reports = drift_data.get("reports", [])
+                        
+                        if recent_reports:
+                            # Retorna último report como cache
+                            last_report = recent_reports[-1]
+                            
+                            # Configuração da janela deslizante
+                            reference_window = 30  # dias
+                            current_window = 7     # dias
+                            mean_threshold = 5.0   # %
+                            std_threshold = 50.0   # %
+                            
+                            return {
+                                "status": "active",
+                                "approach": "sliding_window",
+                                "timestamp": datetime.now().isoformat(),
+                                "ticker": "B3SA3.SA",
+                                "drift_detected": last_report.get("drift_detected", False),
+                                "severity": "medium" if last_report.get("drift_detected") else "none",
+                                "alerts": last_report.get("alerts", []) if last_report.get("alerts") else ["⚠️ Dados do cache local (Yahoo Finance temporariamente indisponível)"],
+                                "current_window": {
+                                    "period": "Último cache disponível",
+                                    "days": current_window,
+                                    "stats": last_report.get("current_stats", {})
+                                },
+                                "reference_window": {
+                                    "period": "Dados do cache",
+                                    "days": reference_window,
+                                    "stats": last_report.get("reference_stats", {})
+                                },
+                                "comparisons": last_report.get("comparisons", {}),
+                                "summary": {
+                                    "total_checks": len(recent_reports),
+                                    "drift_detected_count": sum(1 for r in recent_reports if r.get("drift_detected", False)),
+                                    "drift_rate": round(sum(1 for r in recent_reports if r.get("drift_detected", False)) / len(recent_reports) * 100, 1) if len(recent_reports) > 0 else 0
+                                },
+                                "configuration": {
+                                    "reference_window_days": reference_window,
+                                    "current_window_days": current_window,
+                                    "mean_threshold_pct": mean_threshold,
+                                    "std_threshold_pct": std_threshold
+                                },
+                                "recent_reports": recent_reports[-10:],
+                                "cache_mode": True,
+                                "cache_timestamp": last_report.get("timestamp", "unknown")
+                            }
+                except Exception as e:
+                    pass  # Se falhar ao ler cache, continua para retornar erro
+            
             return {
                 "status": "error",
                 "message": "Não foi possível obter dados do Yahoo Finance",
