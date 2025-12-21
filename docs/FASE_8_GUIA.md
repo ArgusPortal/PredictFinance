@@ -1,9 +1,11 @@
 # 📊 Fase 8: Monitoramento do Modelo em Produção
 
+**Autor:** Argus  
 **Projeto**: PredictFinance - Sistema de Previsão B3SA3.SA  
 **Fase**: 8/8 - **FASE FINAL**  
 **Status**: ✅ Implementada  
-**Data**: Novembro 2025
+**Data**: Novembro 2025  
+**Última atualização:** 21/12/2025 (Drift Detection - Janela Deslizante)
 
 ---
 
@@ -444,121 +446,98 @@ RMSE: 0.0681
 
 **Data Drift** ocorre quando a **distribuição estatística** dos dados muda ao longo do tempo.
 
-**Exemplo no mercado financeiro**:
-- **Treinamento (2020-2024)**: Preços entre R$ 10-15, média R$ 12.50
-- **Produção (2025)**: Preços entre R$ 20-25, média R$ 22.50
+**❌ ABORDAGEM INCORRETA (Problema do projeto original)**:
+- Comparar dados de **treinamento (2020-2023)** com dados de **teste/produção (2025)**
+- Resultado: **SEMPRE** mostrará drift alto (~28% na média, ~47% no desvio padrão)
+- Motivo: Mercado financeiro **naturalmente evolui** (inflação, mudanças econômicas)
+- Conclusão: Esta diferença **NÃO indica problema no modelo**!
 
-O modelo foi treinado em um padrão, mas está recebendo **outro padrão** em produção!
+**✅ ABORDAGEM CORRETA (Janela Deslizante)**:
+- Comparar **janela atual (7 dias)** com **janela de referência (30 dias anteriores)**
+- Objetivo: Detectar **mudanças abruptas e recentes**, não evolução gradual
+- Exemplo:
+  - Se preço estava R$ 13.90 nos últimos 30 dias
+  - E de repente caiu para R$ 10.00 nos últimos 7 dias
+  - **ESTE é um drift significativo** que pode afetar as previsões
 
 ### 🔍 Tipos de Drift
 
-1. **Drift de Entrada (Input Drift)**: Features mudam
+1. **Drift de Entrada (Input Drift)**: Features mudam abruptamente
 2. **Drift de Saída (Prediction Drift)**: Distribuição das previsões muda
 3. **Concept Drift**: Relação entre input e output muda
 
-### 💻 Implementação
+### 💻 Nova Implementação - Janela Deslizante
 
 **Arquivo**: `src/drift_detector.py`
 
-#### Classe Principal: DriftDetector
+#### Classe: SlidingWindowDriftDetector
 
-**1. Configurar Referência (Baseline)**
-
-Primeiro, precisamos estabelecer **estatísticas de referência** dos dados de treinamento:
-
+**Uso Básico:**
 ```python
-from src.drift_detector import DriftDetector
-import numpy as np
+from src.drift_detector import analyze_drift_from_yahoo
 
-detector = DriftDetector(significance_level=0.05)
+# Análise automática com dados do Yahoo Finance
+result = analyze_drift_from_yahoo("B3SA3.SA")
 
-# Carrega dados de treinamento
-train_data = np.load("data/processed/train_data.npy")  # Exemplo
-
-# Configura referência
-detector.set_reference_statistics(train_data)
+print(f"Drift detectado: {result['drift_detected']}")
+print(f"Severidade: {result['severity']}")  # 'none', 'medium', 'high'
+print(f"Alertas: {result['alerts']}")
 ```
 
-**Saída**:
-```
-📊 CALCULANDO ESTATÍSTICAS DE REFERÊNCIA
-══════════════════════════════════════════════════════════
-✅ Estatísticas calculadas:
-   Amostras: 830
-   Média: 12.3456
-   Desvio Padrão: 0.7890
-   Min/Max: 10.2000 / 14.5000
-══════════════════════════════════════════════════════════
-```
+**Janelas de Comparação:**
+- **Janela Atual**: Últimos 7 dias de pregão
+- **Janela Referência**: 30 dias anteriores
+- **Threshold Δ Média**: 5% (mudanças maiores indicam drift)
+- **Threshold Δ Volatilidade**: 50% (volatilidade é mais variável)
 
-**Salva em** `monitoring/reference_statistics.json`:
-```json
-{
-  "timestamp": "2025-11-02T10:00:00",
-  "n_samples": 830,
-  "mean": 12.3456,
-  "std": 0.7890,
-  "min": 10.2000,
-  "max": 14.5000,
-  "median": 12.3200,
-  "q1": 11.8000,
-  "q3": 12.9000,
-  "iqr": 1.1000
-}
-```
-
-**2. Detectar Drift**
-
+**Uso Avançado com Configuração:**
 ```python
-# Dados atuais de produção (últimos 100 valores)
-current_data = np.array([12.5, 12.6, ..., 13.1])
+from src.drift_detector import SlidingWindowDriftDetector
+import yfinance as yf
 
-# Detecta drift
-report = detector.detect_drift(current_data, window_name="last_100_predictions")
+# Inicializa detector com configurações personalizadas
+detector = SlidingWindowDriftDetector(
+    current_window_days=7,
+    reference_window_days=30,
+    mean_threshold_pct=5.0,
+    std_threshold_pct=50.0
+)
+
+# Busca dados
+df = yf.download("B3SA3.SA", start="2025-09-01", end="2025-12-21")
+prices = df['Close'].values
+
+# Executa análise
+report = detector.detect_drift(prices, "B3SA3.SA")
+
+# Exibe resultados
+if report['drift_detected']:
+    print(f"⚠️ Drift detectado! Severidade: {report['severity']}")
+    for alert in report['alerts']:
+        print(f"  • {alert}")
+else:
+    print("✅ Mercado estável")
 ```
 
-**Testes Realizados**:
-
-**A. Teste de Diferença de Média**
-```python
-mean_diff_pct = |(atual - referência)| / referência * 100
-
-if mean_diff_pct > 10%:
-    drift_detected = True
+**Saída Exemplo:**
 ```
+🔍 DETECÇÃO DE DRIFT (JANELA DESLIZANTE)
+============================================================
 
-**B. Teste de Diferença de Desvio Padrão**
-```python
-std_diff_pct = |(std_atual - std_ref)| / std_ref * 100
+📅 Janela Atual: 11/12 a 19/12
+   Média: R$ 13.81
+   Volatilidade: R$ 0.48
 
-if std_diff_pct > 20%:
-    drift_detected = True
-```
+📅 Janela Referência: 29/10 a 10/12
+   Média: R$ 13.92
+   Volatilidade: R$ 0.77
 
-**C. Teste Kolmogorov-Smirnov (KS)**
+📊 Comparação:
+   Δ Média: 0.7% (threshold: 5.0%)
+   Δ Volatilidade: 37.6% (threshold: 50.0%)
 
-Compara distribuições completas:
-```python
-from scipy.stats import ks_2samp
-
-statistic, p_value = ks_2samp(reference_sample, current_data)
-
-if p_value < 0.05:  # Significância 5%
-    drift_detected = True  # Distribuições são diferentes
-```
-
-**Saída**:
-```
-🔍 DETECÇÃO DE DRIFT: last_100_predictions
-══════════════════════════════════════════════════════════
-⚠️  DRIFT DETECTADO!
-   • Média mudou 12.30%
-   • KS test: p-value=0.0023 < 0.05
-
-Comparações:
-   Média: Ref=12.3456, Atual=13.8640 (Δ 12.30%)
-   Std:   Ref=0.7890, Atual=0.9120 (Δ 15.59%)
-══════════════════════════════════════════════════════════
+✅ Sem drift significativo - Mercado estável
+============================================================
 ```
 
 **Salva em** `monitoring/drift_reports.json`:
@@ -566,38 +545,51 @@ Comparações:
 {
   "reports": [
     {
-      "timestamp": "2025-11-02T14:00:00",
-      "window_name": "last_100_predictions",
-      "drift_detected": true,
-      "alerts": [
-        "Média mudou 12.30%",
-        "KS test: p-value=0.0023 < 0.05"
-      ],
-      "current_stats": {
-        "mean": 13.8640,
-        "std": 0.9120
+      "timestamp": "2025-12-21T15:00:00",
+      "ticker": "B3SA3.SA",
+      "drift_detected": false,
+      "severity": "none",
+      "alerts": [],
+      "current_window": {
+        "start": "2025-12-11",
+        "end": "2025-12-19",
+        "mean": 13.81,
+        "std": 0.48,
+        "n_samples": 7
       },
-      "reference_stats": {
-        "mean": 12.3456,
-        "std": 0.7890
+      "reference_window": {
+        "start": "2025-10-29",
+        "end": "2025-12-10",
+        "mean": 13.92,
+        "std": 0.77,
+        "n_samples": 30
       },
       "comparisons": {
-        "mean_diff_pct": 12.30,
-        "std_diff_pct": 15.59
+        "mean_diff_pct": 0.7,
+        "std_diff_pct": 37.6
+      },
+      "config": {
+        "current_window_days": 7,
+        "reference_window_days": 30,
+        "mean_threshold_pct": 5.0,
+        "std_threshold_pct": 50.0
       }
     }
   ]
 }
 ```
 
-**3. Monitorar Distribuição de Previsões**
+**Níveis de Severidade:**
 
-```python
-# Lista de previsões recentes
-predictions = [12.45, 12.50, 12.48, ..., 12.52]
+| Severidade | Condição | Ação Recomendada |
+|------------|----------|------------------|
+| 🟢 **None** | Ambas métricas abaixo do threshold | Continuar monitoramento normal |
+| 🟡 **Medium** | Uma métrica acima do threshold | Monitorar mais de perto, investigar causa |
+| 🔴 **High** | Ambas métricas acima do threshold | Considerar retreino urgente do modelo |
 
-# Analisa distribuição
-analysis = detector.monitor_prediction_distribution(predictions)
+**Integração com API:**
+
+O endpoint `/monitoring/drift` executa esta análise em tempo real:
 
 print(f"Outliers: {analysis['outliers']['count']}")
 print(f"Porcentagem: {analysis['outliers']['percentage']:.1f}%")

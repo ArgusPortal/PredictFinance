@@ -1,5 +1,8 @@
 # 🔍 Sistema de Monitoramento de Performance em Produção
 
+**Autor:** Argus  
+**Última atualização:** 21/12/2025
+
 ## 📋 Visão Geral
 
 O sistema de monitoramento rastreia automaticamente todas as previsões realizadas pelo modelo e as compara com os valores reais do mercado, calculando métricas de performance e detectando degradação.
@@ -67,6 +70,28 @@ O sistema de monitoramento rastreia automaticamente todas as previsões realizad
    │  - Gráficos de tendência     │
    │  - Tabela de previsões       │
    │  - Alertas de degradação     │
+   └──────────────────────────────┘
+
+
+4️⃣ DETECÇÃO DE DRIFT (Janela Deslizante)
+   ┌──────────────────────────────┐
+   │ GET /monitoring/drift        │  Consulta drift
+   └──────────┬───────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────────┐
+   │ SlidingWindowDriftDetector               │
+   │  1. Busca dados Yahoo Finance (90 dias) │
+   │  2. Janela Atual: últimos 7 dias        │
+   │  3. Janela Referência: 30 dias antes    │
+   │  4. Compara métricas                    │
+   │     - Δ Média > 5%?                     │
+   │     - Δ Volatilidade > 50%?             │
+   └──────────┬───────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────┐
+   │ monitoring/drift_reports.json│  Histórico de drift
    └──────────────────────────────┘
 ```
 

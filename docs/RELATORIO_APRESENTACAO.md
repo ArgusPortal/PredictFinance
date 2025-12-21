@@ -414,4 +414,4 @@ Retorna:
 
 **Gerado automaticamente em:** 21/12/2025 15:14 UTC  
 **Sistema:** PredictFinance v1.0.0  
-**Autor:** GitHub Copilot
+**Autor:** Argus

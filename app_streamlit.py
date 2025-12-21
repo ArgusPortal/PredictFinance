@@ -2263,7 +2263,7 @@ elif page == "🔍 Monitoramento":
             
             if drift_response.status_code == 200:
                 drift_data = drift_response.json()
-                drift_status = drift_data.get('status', 'not_configured')
+                drift_status = drift_data.get('status', 'active')  # Assume ativo se não especificado
                 drift_detected = drift_data.get('drift_detected', False)
                 severity = drift_data.get('severity', 'none')
                 alerts = drift_data.get('alerts', [])
@@ -2432,6 +2432,7 @@ elif page == "🔍 Monitoramento":
             
             else:
                 st.error(f"❌ Erro ao buscar dados de drift: Status {drift_response.status_code}")
+                st.info("💡 **O sistema de drift está implementado mas a API pode estar temporariamente indisponível ou retornando erro.**")
                 
                 # Fallback
                 st.markdown("---")
@@ -2441,10 +2442,13 @@ elif page == "🔍 Monitoramento":
                 - Compara últimos 7 dias com 30 dias anteriores
                 - Detecta mudanças ABRUPTAS, não evolução gradual
                 - Thresholds: 5% para média, 50% para volatilidade
+                
+                **Status:** Sistema implementado. Endpoint: `GET /monitoring/drift`
                 """)
                 
         except requests.exceptions.RequestException as e:
-            st.warning(f"⚠️ Não foi possível conectar à API de drift: {str(e)[:50]}")
+            st.warning(f"⚠️ Não foi possível conectar ao endpoint de drift")
+            st.info("💡 **O sistema de drift está implementado na API. Verifique se a API está online.**")
             
             # Fallback
             st.markdown("---")

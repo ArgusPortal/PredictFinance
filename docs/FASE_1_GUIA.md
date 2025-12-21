@@ -275,7 +275,7 @@ Esta fase irá:
 
 Para problemas ou dúvidas:
 1. Verificar logs em `docs/data_collection/data_collection_log.json`
-2. Consultar especificações técnicas em `docs/especificacoes_tecnicas.md`
+2. Consultar documentação técnica em `docs/DOCUMENTACAO_TECNICA.md`
 3. Revisar código-fonte comentado em `src/data_collection.py`
 
 ---

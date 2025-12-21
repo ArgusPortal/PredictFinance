@@ -90,6 +90,9 @@ curl "https://b3sa3-api.onrender.com/monitoring/performance"
 
 # Validar previsões pendentes
 curl -X POST "https://b3sa3-api.onrender.com/monitoring/validate?days_back=7"
+
+# Verificar drift detection (janela deslizante)
+curl "https://b3sa3-api.onrender.com/monitoring/drift"
 ```
 
 **Resposta:**
@@ -430,7 +433,7 @@ Cada componente do sistema se integra com os demais:
 
 ## 📚 Documentação Adicional
 
-- [Especificações Técnicas](docs/especificacoes_tecnicas.md)
+- [Documentação Técnica Completa](docs/DOCUMENTACAO_TECNICA.md)
 - [Guia de Instalação](docs/instalacao.md)
 - [API Reference](docs/api_reference.md)
 - [Metodologia LSTM](docs/metodologia_lstm.md)

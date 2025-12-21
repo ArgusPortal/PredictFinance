@@ -11,6 +11,7 @@ Abordagem correta para séries temporais:
 - Detecta mudanças ABRUPTAS e RECENTES
 - Thresholds ajustados para volatilidade normal do mercado
 
+Autor: Argus
 Data: 21/12/2025
 """
 

@@ -134,19 +134,24 @@ Este diretório contém a documentação completa do projeto **PredictFinance**,
 **Conteúdo**:
 - Logging estruturado de requisições (PredictionLogger, MetricsLogger)
 - Monitoramento de performance (validação previsões vs valores reais)
-- Detecção de drift de dados (testes estatísticos + Evidently AI)
+- **Detecção de drift com janela deslizante** (7 dias vs 30 dias anteriores)
 - Sistema de alertas automáticos (Slack, email, logs)
 - Monitoramento de uptime (health check + UptimeRobot)
 - Automação com cron jobs / GitHub Actions
 
+**⚠️ IMPORTANTE - Drift Detection:**
+- ✅ **Abordagem correta:** Janela deslizante (detecta mudanças abruptas recentes)
+- ❌ **Abordagem incorreta:** Comparar dados de treino (2020-2023) com produção (2025)
+- Toda documentação atualizada em 21/12/2025
+
 **Scripts**: 
 - `api/monitoring.py` (logging system)
 - `src/performance_monitor.py` (performance tracking)
-- `src/drift_detector.py` (drift detection)
+- `src/drift_detector.py` (janela deslizante - ATUALIZADO)
 - `src/alert_system.py` (alertas)
 - `run_daily_monitoring.py` (execução diária)
 - `test_monitoring.py` (testes do sistema)
-- `setup_monitoring.py` (configuração inicial)
+- `setup_drift_detection.py` (análise de drift)
 
 **Saídas**: 
 - Logs em `logs/predictions.log` e `logs/metrics.log`
@@ -203,14 +208,24 @@ Este diretório contém a documentação completa do projeto **PredictFinance**,
 
 ## 📊 Documentos Técnicos
 
-### Especificações Técnicas
-**Arquivo**: [`especificacoes_tecnicas.md`](especificacoes_tecnicas.md)
+### Documentação Técnica Completa
+
+**Arquivo**: [`DOCUMENTACAO_TECNICA.md`](DOCUMENTACAO_TECNICA.md)
 
 **Conteúdo**:
-- Arquitetura completa do sistema
-- Cronograma de 9 dias úteis
-- Requisitos técnicos detalhados
-- Diagrama de fluxo de dados
+- Documentação técnica completa pós-implementação (2,227 linhas)
+- Arquitetura LSTM implementada (2 camadas: 64→32 units)
+- Resultados reais alcançados:
+  - MAPE = 1.53% (meta < 5%)
+  - R² = 0.935 (meta > 0.85)
+- Detalhamento de todas as 8 fases implementadas
+- Análise exploratória e estatísticas descritivas
+- Curvas de aprendizado e gráficos de resultado
+- Referências acadêmicas (arXiv, IEEE)
+
+**Público**: Desenvolvedores, pesquisadores, analistas técnicos
+
+**Quando usar**: Para entender a implementação real, arquitetura final, resultados alcançados
 
 ---
 
@@ -245,7 +260,7 @@ docs/
 ├── FASE_3_GUIA.md                    ✅ Guia da Fase 3
 ├── FASE_4_GUIA.md                    ✅ Guia da Fase 4
 ├── FASE_5_GUIA.md                    ✅ Guia da Fase 5
-├── especificacoes_tecnicas.md        ✅ Especificações completas
+├── DOCUMENTACAO_TECNICA.md            ✅ Documentação técnica completa pós-implementação
 ├── RESUMO_PROJETO.md                 ✅ Resumo executivo
 ├── INSTRUCOES_EXECUCAO.md            ✅ Setup e comandos
 ├── INDEX.md                          ✅ Este arquivo
@@ -288,7 +303,7 @@ docs/
 6. [FASE_5_GUIA.md](FASE_5_GUIA.md) - Verificar artefatos
 
 **Quero entender a arquitetura:**
-- [especificacoes_tecnicas.md](especificacoes_tecnicas.md)
+- [DOCUMENTACAO_TECNICA.md](DOCUMENTACAO_TECNICA.md)
 - [FASE_3_GUIA.md](FASE_3_GUIA.md)
 - [model_architecture/model_info.json](model_architecture/model_info.json)
 
@@ -341,23 +356,66 @@ ls -lh docs/*/
 
 ---
 
-## 🔗 Links Úteis
+## � Documentação Adicional
 
-### Repositórios e Código
-- **GitHub**: [ArgusPortal/PredictFinance](https://github.com/ArgusPortal/PredictFinance)
-- **Branch Principal**: `main`
+### Guias Quick Start
+- [`MONITORING_QUICKSTART.md`](MONITORING_QUICKSTART.md) - Comandos rápidos para monitoramento
+- [`DEPLOY_QUICKSTART.md`](DEPLOY_QUICKSTART.md) - Deploy rápido em produção
+- [`YAHOO_FINANCE_GUIDE.md`](YAHOO_FINANCE_GUIDE.md) - ✅ **CONSOLIDADO** - Guia completo Yahoo Finance API
 
-### Referências Técnicas
-- [Keras LSTM Documentation](https://keras.io/api/layers/recurrent_layers/lstm/)
-- [Scikit-learn MinMaxScaler](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Yahoo Finance API (yfinance)](https://pypi.org/project/yfinance/)
+### Arquitetura e Sistemas
+- [`ARQUITETURA_MONITORAMENTO.md`](ARQUITETURA_MONITORAMENTO.md) - Diagramas do sistema de monitoramento
+- [`MONITORING_SYSTEM.md`](MONITORING_SYSTEM.md) - Sistema completo de monitoramento
+- [`DOCUMENTACAO_TECNICA.md`](DOCUMENTACAO_TECNICA.md) - Documentação técnica completa
+
+### Relatórios
+- [`RELATORIO_APRESENTACAO.md`](RELATORIO_APRESENTACAO.md) - Relatório com métricas para apresentação (ATUALIZADO 21/12/2025)
+
+### Troubleshooting
+- [`RETRAIN_TROUBLESHOOTING.md`](RETRAIN_TROUBLESHOOTING.md) - Solução de problemas no retreino
+- [`YAHOO_FINANCE_GUIDE.md`](YAHOO_FINANCE_GUIDE.md) - Guia completo e troubleshooting Yahoo Finance
+
+### Análise de Documentação
+- [`DOCUMENTACAO_OBSOLETA.md`](DOCUMENTACAO_OBSOLETA.md) - Análise de documentos obsoletos/duplicados (21/12/2025)
+
+---
+
+## 🔄 Atualizações Recentes (21/12/2025)
+
+### Drift Detection - Janela Deslizante
+
+**Problema Corrigido:**
+- ❌ Abordagem anterior comparava dados de treino (2020-2023) com produção (2025)
+- ❌ Resultado: Sempre mostrava drift alto (~28% média) devido à evolução natural do mercado
+- ❌ Conclusão incorreta: "Modelo está degradando"
+
+**Solução Implementada:**
+- ✅ Janela deslizante: últimos 7 dias vs 30 dias anteriores
+- ✅ Detecta mudanças ABRUPTAS e RECENTES, não evolução gradual
+- ✅ Thresholds: 5% para média, 50% para volatilidade
+- ✅ Integrado com API: `GET /monitoring/drift`
+- ✅ Streamlit: Tab "🌊 Drift Detection" atualizada
+
+**Documentos Atualizados:**
+1. ✅ [RELATORIO_APRESENTACAO.md](RELATORIO_APRESENTACAO.md) - Seção 9 reescrita
+2. ✅ [MONITORING_SYSTEM.md](MONITORING_SYSTEM.md) - Fluxo atualizado
+3. ✅ [MONITORING_QUICKSTART.md](MONITORING_QUICKSTART.md) - Novos comandos
+4. ✅ [FASE_8_GUIA.md](FASE_8_GUIA.md) - Explicação completa da janela deslizante
+5. ✅ [ARQUITETURA_MONITORAMENTO.md](ARQUITETURA_MONITORAMENTO.md) - Diagramas atualizados
+6. ✅ [README.md](../README.md) - Endpoint de drift adicionado
+
+**Documentos Consolidados/Removidos:**
+- ❌ FASE_12_MONITORAMENTO.md → Conteúdo estava duplicado com FASE_8_GUIA.md
+- ✅ [YAHOO_FINANCE_GUIDE.md](YAHOO_FINANCE_GUIDE.md) → Consolidou:
+  - ❌ YAHOO_API_V8_QUICKSTART.md
+  - ❌ YAHOO_FINANCE_SOLUTION.md
+  - ❌ YAHOO_FINANCE_ERROR_ANALYSIS.md
 
 ---
 
 ## ✅ Status do Projeto
 
-**Progresso Geral**: 75% (6/8 fases concluídas)
+**Progresso Geral**: 100% (8/8 fases concluídas)
 
 | Fase | Status | Documentação |
 |------|--------|--------------|
@@ -367,8 +425,8 @@ ls -lh docs/*/
 | Fase 4 | ✅ Concluída | [FASE_4_GUIA.md](FASE_4_GUIA.md) |
 | Fase 5 | ✅ Concluída | [FASE_5_GUIA.md](FASE_5_GUIA.md) |
 | Fase 6 | ✅ Concluída | [FASE_6_GUIA.md](FASE_6_GUIA.md) |
-| Fase 7 | ⏳ Pendente | A ser criado |
-| Fase 8 | ⏳ Pendente | A ser criado |
+| Fase 7 | ✅ Concluída | [FASE_7_GUIA.md](FASE_7_GUIA.md) |
+| Fase 8 | ✅ Concluída | [FASE_8_GUIA.md](FASE_8_GUIA.md) - ATUALIZADO |
 
 ---
 
@@ -378,6 +436,7 @@ Para dúvidas ou problemas:
 1. Consulte o guia específico da fase
 2. Verifique a seção de Troubleshooting
 3. Consulte [INSTRUCOES_EXECUCAO.md](INSTRUCOES_EXECUCAO.md)
+4. Revise [DOCUMENTACAO_OBSOLETA.md](DOCUMENTACAO_OBSOLETA.md) para status de documentos
 
 ---
 

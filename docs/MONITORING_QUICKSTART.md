@@ -1,5 +1,8 @@
 # ⚡ Quick Start - Sistema de Monitoramento (Fase 8)
 
+**Autor:** Argus  
+**Última atualização:** 21/12/2025
+
 Comandos rápidos para configurar e usar o sistema de monitoramento.
 
 ---
@@ -99,21 +102,30 @@ cat monitoring/performance_metrics.json | python -m json.tool | grep -A 5 "summa
 
 ---
 
-## 🌊 Verificar Drift
+## 🌊 Verificar Drift (Janela Deslizante)
 
 ```bash
-# Resumo de drift
-python -c "
-from src.drift_detector import DriftDetector
-detector = DriftDetector()
-summary = detector.get_drift_summary(days=7)
-print(f'Checagens: {summary.get(\"total_checks\", 0)}')
-print(f'Drift detectado: {summary.get(\"drift_detected_count\", 0)}')
-print(f'Taxa: {summary.get(\"drift_rate\", 0):.1f}%')
-"
+# Análise de drift atualizada
+python setup_drift_detection.py
 
-# Ou verificar arquivo
-cat monitoring/drift_reports.json | python -m json.tool | tail -n 30
+# Ou via API (se disponível)
+curl "http://localhost:8000/monitoring/drift"
+
+# Verificar histórico de análises
+cat monitoring/drift_reports.json | python -m json.tool | tail -n 50
+
+# Ver última análise com Python
+python -c "
+import json
+with open('monitoring/drift_reports.json') as f:
+    data = json.load(f)
+    if data.get('reports'):
+        last = data['reports'][-1]
+        print(f'Data: {last[\"timestamp\"]}')
+        print(f'Drift detectado: {last[\"drift_detected\"]}')
+        print(f'Severidade: {last.get(\"severity\", \"none\")}')
+        print(f'Alertas: {len(last.get(\"alerts\", []))}')
+"
 ```
 
 ---

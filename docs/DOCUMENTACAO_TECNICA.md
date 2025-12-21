@@ -2,12 +2,14 @@
 
 **Sistema de Previsão de Preços de Ações B3SA3.SA com LSTM**
 
+**Autor**: Argus
+
 ---
 
 **Projeto**: PredictFinance  
 **Versão**: 1.0.0  
 **Data**: 02 de Novembro de 2025  
-**Autor**: ArgusPortal  
+**Atualização**: 21 de Dezembro de 2025  
 **Repositório**: [github.com/ArgusPortal/PredictFinance](https://github.com/ArgusPortal/PredictFinance)  
 **API em Produção**: [https://b3sa3-api.onrender.com](https://b3sa3-api.onrender.com)
 

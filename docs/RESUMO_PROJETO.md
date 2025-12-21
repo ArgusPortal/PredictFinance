@@ -19,7 +19,7 @@ PredictFinance/
 ├── api/                  ✅ Criado (vazio, para Fase 6)
 ├── notebooks/            ✅ Criado
 ├── docs/                 ✅ Criado
-│   ├── especificacoes_tecnicas.md  ✅ Completo
+│   ├── DOCUMENTACAO_TECNICA.md  ✅ Completo
 │   ├── FASE_1_GUIA.md              ✅ Completo
 │   └── INSTRUCOES_EXECUCAO.md      ✅ Completo
 ├── tests/                ✅ Criado
@@ -42,7 +42,7 @@ PredictFinance/
 - Métricas de avaliação
 - Princípios e referências
 
-### 2. Especificações Técnicas (`docs/especificacoes_tecnicas.md`)
+### 2. Documentação Técnica Completa (`docs/DOCUMENTACAO_TECNICA.md`)
 - Contexto e justificativa
 - Arquitetura do sistema completa
 - Especificações detalhadas de cada fase
@@ -240,7 +240,7 @@ python src/data_collection.py
 
 ### Para Revisores
 - Verifique `README.md` para visão geral
-- Consulte `docs/especificacoes_tecnicas.md` para detalhes técnicos
+- Consulte `docs/DOCUMENTACAO_TECNICA.md` para detalhes técnicos
 - Revise código em `src/` (totalmente comentado)
 
 ### Para IA/Agentes
@@ -253,7 +253,7 @@ python src/data_collection.py
 ## 📞 SUPORTE
 
 - **Documentação Principal**: `README.md`
-- **Especificações**: `docs/especificacoes_tecnicas.md`
+- **Especificações**: `docs/DOCUMENTACAO_TECNICA.md`
 - **Guias de Fase**: `docs/FASE_X_GUIA.md`
 - **Código-fonte**: `src/` (comentado)
 
