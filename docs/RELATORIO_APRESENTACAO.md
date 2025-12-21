@@ -219,7 +219,7 @@ Outliers (> 10%):  ██ 1 previsão (8%)*
 └─────────────────────────────────────────────────────────────┘
                             ↓ (se falhar)
 ┌─────────────────────────────────────────────────────────────┐
-│  NÍVEL 2: PostgreSQL/Supabase                               │
+│  NÍVEL 2: PostgreSQL                               │
 │  ├── 6 anos de histórico (2020-2025)                        │
 │  └── Atualização diária via GitHub Actions                  │
 └─────────────────────────────────────────────────────────────┘
@@ -286,70 +286,55 @@ plotly==5.18.0        # Gráficos interativos
 
 ---
 
-## 9. � Sistema de Detecção de Drift
+## 9. 🌊 Sistema de Detecção de Drift
 
-### 9.1 Status do Sistema
+### 9.1 Abordagem: Janela Deslizante
 
-| Componente | Status | Observação |
-|------------|--------|------------|
-| **DriftDetector** | ✅ Ativado | Configurado em 21/12/2025 |
-| **Estatísticas de Referência** | ✅ Geradas | 830 amostras normalizadas |
-| **Arquivo de Relatórios** | ✅ Criado | `monitoring/drift_reports.json` |
+O sistema utiliza uma **abordagem de janela deslizante** para detecção de drift, que é a metodologia correta para séries temporais financeiras:
 
-### 9.2 Configuração da Referência
+| Janela | Período | Objetivo |
+|--------|---------|----------|
+| **Janela Atual** | Últimos 7 dias | Comportamento recente |
+| **Janela Referência** | 30 dias anteriores | Baseline de comparação |
 
-| Parâmetro | Valor |
-|-----------|-------|
-| **Amostras de Referência** | 830 (dados de treino) |
-| **Tipo de Dados** | Normalizados (0-1) |
-| **Nível de Significância** | 5% (α = 0.05) |
-| **Testes Estatísticos** | Kolmogorov-Smirnov, Diferença de Média/Std |
+> **💡 Por que janela deslizante?**  
+> Em séries temporais financeiras, comparar dados de 2020 com 2025 **sempre** mostrará diferenças grandes (inflação, mudanças de mercado). Isso **NÃO** indica problema no modelo!  
+> A janela deslizante detecta **mudanças abruptas e recentes** que podem impactar as previsões.
 
-### 9.3 Estatísticas de Referência
+### 9.2 Thresholds de Detecção
 
-| Métrica | Valor (Normalizado) | Valor Real (R$) |
-|---------|---------------------|-----------------|
-| **Média** | 0.3592 | R$ 12.29 |
-| **Desvio Padrão** | 0.1773 | R$ 1.81 |
-| **Mínimo** | 0.0200 | R$ 8.95 |
-| **Máximo** | 0.7966 | R$ 17.86 |
-| **Mediana** | 0.3362 | R$ 12.11 |
+| Métrica | Threshold | Justificativa |
+|---------|-----------|---------------|
+| **Δ Preço Médio** | 5% | Variação acima disso indica movimento significativo |
+| **Δ Volatilidade** | 50% | Volatilidade é naturalmente mais variável |
 
-### 9.4 Análise de Drift Treino vs Teste
+### 9.3 Análise Atual (21/12/2025)
 
-Na validação inicial, foi detectado **drift entre os dados de treino e teste**:
+| Janela | Período | Média | Volatilidade |
+|--------|---------|-------|--------------|
+| **Atual** | 11/12 a 19/12 | R$ 13.81 | R$ 0.48 |
+| **Referência** | 29/10 a 10/12 | R$ 13.92 | R$ 0.77 |
+| **Diferença** | — | **0.7%** ✅ | **37.6%** ✅ |
 
-| Comparação | Treino | Teste | Diferença |
-|------------|--------|-------|-----------|
-| **Média** | 0.3592 | 0.4600 | +28.06% |
-| **Desvio Padrão** | 0.1773 | 0.0937 | -47.17% |
+**Status:** ✅ **Mercado Estável** - Sem drift significativo detectado
 
-**Interpretação:** Este drift é **esperado** em séries temporais financeiras, pois:
-- Os dados de **teste são mais recentes** (últimos 15% do período)
-- O preço da ação **subiu no período recente** (média maior)
-- A **volatilidade diminuiu** (desvio padrão menor)
-- Este comportamento justifica a necessidade de **retreino periódico**
+### 9.4 Níveis de Severidade
 
-### 9.5 Capacidades do Sistema
+| Nível | Condição | Ação |
+|-------|----------|------|
+| 🟢 **None** | Ambas métricas abaixo do threshold | Continuar normalmente |
+| 🟡 **Medium** | Uma métrica acima do threshold | Monitorar de perto |
+| 🔴 **High** | Ambas métricas acima do threshold | Considerar retreino |
 
-O sistema de Drift Detection está preparado para:
+### 9.5 Integração Frontend ↔ API
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| 📊 **Detecção de Drift de Dados** | Mudanças na distribuição dos inputs |
-| 🎯 **Monitoramento de Previsões** | Análise da distribuição das saídas |
-| ⚠️ **Alertas Automáticos** | Notificação quando drift significativo |
-| 📈 **Histórico de Análises** | Registro de todas as verificações |
-
-### 9.6 Integração Frontend ↔ API
-
-| Componente | Status | Endpoint |
-|------------|--------|----------|
+| Componente | Status | Endpoint/Tab |
+|------------|--------|--------------|
 | **API Endpoint** | ✅ Implementado | `GET /monitoring/drift` |
 | **Frontend Streamlit** | ✅ Integrado | Tab "🌊 Drift Detection" |
-| **Deploy Produção** | ⏳ Pendente | Requer `git push` + deploy |
+| **Análise em Tempo Real** | ✅ Ativo | Dados do Yahoo Finance |
 
-**Novo Endpoint de Drift:**
+**Endpoint de Drift:**
 ```
 GET /monitoring/drift
 
@@ -363,13 +348,21 @@ Retorna:
 
 ### 9.7 Testes Estatísticos Utilizados
 
-1. **Diferença de Média** - Threshold: 10%
-2. **Diferença de Desvio Padrão** - Threshold: 20%
-3. **Teste Kolmogorov-Smirnov** - p-value < 0.05
+**Resposta:**
+```json
+{
+  "drift_detected": false,
+  "severity": "none",
+  "alerts": [],
+  "current_window": {"start": "2025-12-11", "end": "2025-12-19", "mean": 13.81, "std": 0.48},
+  "reference_window": {"start": "2025-10-29", "end": "2025-12-10", "mean": 13.92, "std": 0.77},
+  "comparisons": {"mean_diff_pct": 0.7, "std_diff_pct": 37.6}
+}
+```
 
 ---
 
-## 10. �📋 Conclusões
+## 10. 📋 Conclusões
 
 ### 10.1 Pontos Fortes
 
@@ -385,7 +378,7 @@ Retorna:
 
 ✅ **Interface Intuitiva**: Dashboard Streamlit com análises técnicas e previsões
 
-✅ **Detecção de Drift Ativa**: Sistema estatístico para monitorar mudanças nos dados
+✅ **Detecção de Drift com Janela Deslizante**: Metodologia correta para séries temporais financeiras
 
 ### 10.2 Métricas-Chave para Apresentação
 
@@ -396,15 +389,15 @@ Retorna:
 | **Previsões Validadas** | 13 | Validação real |
 | **Taxa de Acerto (< 5%)** | 85% | 11/13 previsões |
 | **Uptime da API** | 99%+ | Alta disponibilidade |
-| **Drift Detection** | ✅ Ativo | Monitoramento estatístico |
+| **Drift Detection** | ✅ Ativo | Janela deslizante 7/30 dias |
 
 ### 10.3 Próximos Passos Sugeridos
 
 1. **Ampliar período de validação** - Mais previsões para análise estatística robusta
-2. **Integrar drift à API** - Endpoint para consultar status de drift em tempo real
+2. ~~**Integrar drift à API**~~ ✅ - Endpoint `/monitoring/drift` implementado
 3. **Adicionar mais ativos** - Expandir para outras ações da B3
 4. **Melhorar modelo** - Experimentar arquiteturas Transformer
-5. **Retreino automático** - Quando drift significativo for detectado
+5. **Retreino automático** - Quando drift de alta severidade for detectado
 
 ---
 

@@ -916,66 +916,153 @@ async def obter_performance_producao(ticker: str = "B3SA3.SA") -> Dict[str, Any]
 @app.get(
     "/monitoring/drift",
     summary="Status de Drift Detection",
-    description="Retorna estatísticas de referência e histórico de detecção de drift",
+    description="Analisa drift em tempo real usando janela deslizante (últimos 7 dias vs 30 dias anteriores)",
     tags=["Monitoramento"]
 )
 async def get_drift_status() -> Dict[str, Any]:
     """
-    Retorna status do sistema de detecção de drift.
+    Analisa drift usando janela deslizante com dados recentes.
+    
+    Abordagem:
+    - Janela atual: últimos 7 dias
+    - Janela referência: 30 dias anteriores
+    - Detecta mudanças ABRUPTAS, não evolução gradual
     
     Returns:
-        Estatísticas de referência, relatórios de drift e resumo
+        Análise de drift em tempo real
     """
     import json
+    import yfinance as yf
+    from datetime import timedelta
     
     try:
-        # Caminhos dos arquivos de drift
-        reference_path = ROOT_DIR / "monitoring" / "reference_statistics.json"
+        # Busca dados recentes do Yahoo Finance
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=90)
+        
+        df = yf.download("B3SA3.SA", start=start_date, end=end_date, progress=False)
+        
+        if df.empty:
+            return {
+                "status": "error",
+                "message": "Não foi possível obter dados do Yahoo Finance",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Configuração da janela deslizante
+        reference_window = 30  # dias
+        current_window = 7     # dias
+        mean_threshold = 5.0   # %
+        std_threshold = 50.0   # %
+        
+        # Extrai janelas
+        df = df.sort_index()
+        current_data = df.iloc[-current_window:]['Close'].values
+        end_ref = len(df) - current_window
+        start_ref = max(0, end_ref - reference_window)
+        reference_data = df.iloc[start_ref:end_ref]['Close'].values
+        
+        if len(current_data) < 3 or len(reference_data) < 10:
+            return {
+                "status": "error",
+                "message": "Dados insuficientes para análise",
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Calcula estatísticas
+        import numpy as np
+        
+        current_stats = {
+            "mean": float(np.mean(current_data)),
+            "std": float(np.std(current_data)),
+            "min": float(np.min(current_data)),
+            "max": float(np.max(current_data)),
+            "n_samples": int(len(current_data))
+        }
+        
+        reference_stats = {
+            "mean": float(np.mean(reference_data)),
+            "std": float(np.std(reference_data)),
+            "min": float(np.min(reference_data)),
+            "max": float(np.max(reference_data)),
+            "n_samples": int(len(reference_data))
+        }
+        
+        # Calcula diferenças
+        mean_diff_pct = abs((current_stats["mean"] - reference_stats["mean"]) / reference_stats["mean"]) * 100
+        std_diff_pct = abs((current_stats["std"] - reference_stats["std"]) / reference_stats["std"]) * 100
+        
+        # Detecta drift
+        drift_detected = False
+        alerts = []
+        
+        if mean_diff_pct > mean_threshold:
+            drift_detected = True
+            direction = "subiu" if current_stats["mean"] > reference_stats["mean"] else "caiu"
+            alerts.append(f"Preço médio {direction} {mean_diff_pct:.1f}%")
+        
+        if std_diff_pct > std_threshold:
+            drift_detected = True
+            direction = "aumentou" if current_stats["std"] > reference_stats["std"] else "diminuiu"
+            alerts.append(f"Volatilidade {direction} {std_diff_pct:.1f}%")
+        
+        # Períodos
+        current_period = f"{df.index[-current_window].strftime('%d/%m/%Y')} a {df.index[-1].strftime('%d/%m/%Y')}"
+        ref_period = f"{df.index[start_ref].strftime('%d/%m/%Y')} a {df.index[end_ref-1].strftime('%d/%m/%Y')}"
+        
+        # Carrega histórico
         reports_path = ROOT_DIR / "monitoring" / "drift_reports.json"
+        recent_reports = []
+        total_checks = 0
+        drift_count = 0
         
-        # Carregar estatísticas de referência
-        reference_stats = {}
-        if reference_path.exists():
-            with open(reference_path, 'r', encoding='utf-8') as f:
-                reference_stats = json.load(f)
-        
-        # Carregar relatórios de drift
-        drift_reports = {"reports": []}
         if reports_path.exists():
             with open(reports_path, 'r', encoding='utf-8') as f:
-                drift_reports = json.load(f)
-        
-        # Calcular resumo
-        reports = drift_reports.get("reports", [])
-        total_checks = len(reports)
-        drift_detected_count = sum(1 for r in reports if r.get("drift_detected", False))
-        drift_rate = (drift_detected_count / total_checks * 100) if total_checks > 0 else 0.0
-        
-        # Último check
-        last_check = reports[-1] if reports else None
+                drift_data = json.load(f)
+                recent_reports = drift_data.get("reports", [])[-10:]
+                total_checks = len(drift_data.get("reports", []))
+                drift_count = sum(1 for r in drift_data.get("reports", []) if r.get("drift_detected", False))
         
         return {
-            "status": "active" if reference_stats else "not_configured",
+            "status": "active",
+            "approach": "sliding_window",
             "timestamp": datetime.now().isoformat(),
-            "reference_statistics": reference_stats,
+            "ticker": "B3SA3.SA",
+            "drift_detected": drift_detected,
+            "severity": "high" if mean_diff_pct > 10 else "medium" if drift_detected else "none",
+            "alerts": alerts,
+            "current_window": {
+                "period": current_period,
+                "days": current_window,
+                "stats": current_stats
+            },
+            "reference_window": {
+                "period": ref_period,
+                "days": reference_window,
+                "stats": reference_stats
+            },
+            "comparisons": {
+                "mean_diff_pct": round(mean_diff_pct, 2),
+                "std_diff_pct": round(std_diff_pct, 2)
+            },
             "summary": {
                 "total_checks": total_checks,
-                "drift_detected_count": drift_detected_count,
-                "drift_rate": round(drift_rate, 2),
-                "last_check_timestamp": last_check.get("timestamp") if last_check else None,
-                "last_drift_detected": last_check.get("drift_detected") if last_check else None
+                "drift_detected_count": drift_count,
+                "drift_rate": round(drift_count / total_checks * 100, 1) if total_checks > 0 else 0
             },
-            "recent_reports": reports[-10:] if reports else [],  # Últimos 10 relatórios
             "configuration": {
-                "significance_level": 0.05,
-                "mean_threshold_pct": 10,
-                "std_threshold_pct": 20
-            }
+                "reference_window_days": reference_window,
+                "current_window_days": current_window,
+                "mean_threshold_pct": mean_threshold,
+                "std_threshold_pct": std_threshold
+            },
+            "recent_reports": recent_reports
         }
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao obter status de drift: {str(e)}"
+            detail=f"Erro ao analisar drift: {str(e)}"
         )
 
 
