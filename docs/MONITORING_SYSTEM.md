@@ -1,11 +1,17 @@
 # 🔍 Sistema de Monitoramento de Performance em Produção
 
 **Autor:** Argus  
-**Última atualização:** 21/12/2025
+**Última atualização:** 02/01/2026  
+**Versão:** 2.1.0
 
 ## 📋 Visão Geral
 
 O sistema de monitoramento rastreia automaticamente todas as previsões realizadas pelo modelo e as compara com os valores reais do mercado, calculando métricas de performance e detectando degradação.
+
+**Novidades v2.1:**
+- 🗄️ **PostgreSQL Render**: Persistência de previsões em banco de dados (18+ registros)
+- 🔍 **Drift Detection Aprimorado**: API v8 como método primário com fallbacks
+- 📊 **Dual Persistence**: PostgreSQL (produção) + JSON (backup local)
 
 ---
 
@@ -30,9 +36,16 @@ O sistema de monitoramento rastreia automaticamente todas as previsões realizad
    └──────────┬───────────────────┘
               │
               ▼
+   ┌──────────────────────────────────────┐
+   │ PostgreSQL Render (PRODUÇÃO)         │
+   │   predictions table: 18+ registros   │
+   │   + dual persistence                 │
+   └──────────┬───────────────────────────┘
+              │
+              ▼
    ┌──────────────────────────────┐
    │ monitoring/                  │
-   │   predictions_tracking.json  │  Armazena para validação
+   │   predictions_tracking.json  │  Backup local
    └──────────────────────────────┘
 
 
@@ -73,21 +86,24 @@ O sistema de monitoramento rastreia automaticamente todas as previsões realizad
    └──────────────────────────────┘
 
 
-4️⃣ DETECÇÃO DE DRIFT (Janela Deslizante)
+4️⃣ DETECÇÃO DE DRIFT (Janela Deslizante - API v8)
    ┌──────────────────────────────┐
    │ GET /monitoring/drift        │  Consulta drift
    └──────────┬───────────────────┘
               │
               ▼
-   ┌──────────────────────────────────────────┐
-   │ SlidingWindowDriftDetector               │
-   │  1. Busca dados Yahoo Finance (90 dias) │
-   │  2. Janela Atual: últimos 7 dias        │
-   │  3. Janela Referência: 30 dias antes    │
-   │  4. Compara métricas                    │
-   │     - Δ Média > 5%?                     │
-   │     - Δ Volatilidade > 50%?             │
-   └──────────┬───────────────────────────────┘
+   ┌────────────────────────────────────────────────┐
+   │ SlidingWindowDriftDetector                     │
+   │  1. Busca dados (método hierárquico):          │
+   │     ├─ Yahoo Finance API v8 (primário)         │
+   │     ├─ yfinance (fallback)                     │
+   │     └─ Cache JSON (último recurso)             │
+   │  2. Janela Atual: últimos 7 dias               │
+   │  3. Janela Referência: 30 dias antes           │
+   │  4. Compara métricas                           │
+   │     - Δ Média > 5%?                            │
+   │     - Δ Volatilidade > 50%?                    │
+   └──────────┬─────────────────────────────────────┘
               │
               ▼
    ┌──────────────────────────────┐
@@ -128,7 +144,7 @@ Registra uma previsão para validação futura.
 
 ### 2. GET /monitoring/performance
 
-Retorna métricas de performance do modelo em produção.
+Retorna métricas de performance do modelo em produção (consulta PostgreSQL primeiro, fallback para JSON).
 
 **Parâmetros:**
 - `ticker` (opcional): Símbolo da ação (default: B3SA3.SA)
@@ -208,6 +224,33 @@ Executa validação de previsões pendentes.
 ```
 
 **Uso:** Chamado manualmente ou via cron job
+
+---
+
+### 4. GET /debug/database
+
+Diagnóstico de conexão PostgreSQL (somente produção).
+
+**Resposta:**
+```json
+{
+  "environment": "production",
+  "postgres_enabled": true,
+  "db_manager_pg_enabled": true,
+  "db_manager_source": "database.db_manager",
+  "postgres_url_available": true,
+  "postgres_url_preview": "postgresql://predictfinance_gb6k_user@...",
+  "postgres_predictions": 18,
+  "postgres_metrics": 0,
+  "json_predictions": 18,
+  "json_daily_metrics": 14
+}
+```
+
+**Verificação:**
+```bash
+curl https://b3sa3-api.onrender.com/debug/database
+```
 
 ---
 

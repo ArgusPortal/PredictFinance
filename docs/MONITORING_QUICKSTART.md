@@ -1,9 +1,19 @@
 # ⚡ Quick Start - Sistema de Monitoramento (Fase 8)
 
 **Autor:** Argus  
-**Última atualização:** 21/12/2025
+**Última atualização:** 02/01/2026 (v2.1)  
+**Novidades:** PostgreSQL, Drift API v8, Dual Persistence
 
 Comandos rápidos para configurar e usar o sistema de monitoramento.
+
+---
+
+## 🆕 Novidades v2.1 (Janeiro 2026)
+
+- 🗄️ **PostgreSQL Render**: 18+ previsões rastreadas em produção
+- 🔍 **Drift API v8**: Método hierárquico com 3 fallbacks
+- 📊 **Dual Persistence**: PostgreSQL + JSON backup
+- 🔧 **Debug Endpoint**: `/debug/database` para diagnóstico
 
 ---
 
@@ -82,7 +92,50 @@ cat monitoring/daily_summary.json | python -m json.tool
 ```
 
 ---
+## 🗄️ Verificar PostgreSQL (v2.1)
 
+### Debug Endpoint (Produção)
+
+```bash
+# Verificar conexão PostgreSQL
+curl https://b3sa3-api.onrender.com/debug/database
+```
+
+**Saída esperada:**
+```json
+{
+  "environment": "production",
+  "postgres_enabled": true,
+  "db_manager_pg_enabled": true,
+  "postgres_predictions": 18,
+  "postgres_metrics": 0,
+  "json_predictions": 18,
+  "json_daily_metrics": 14
+}
+```
+
+### Consultar Previsões
+
+```bash
+# Consultar previsões em produção
+curl https://b3sa3-api.onrender.com/monitoring/performance | python -m json.tool
+
+# Verificar total de previsões
+curl -s https://b3sa3-api.onrender.com/monitoring/performance | \
+  python -c "import sys, json; data=json.load(sys.stdin); print(f'Total: {data[\"summary\"][\"total_predictions_validated\"]} previsões')"
+```
+
+### Conexão Local (Desenvolvimento)
+
+```bash
+# Testar conexão PostgreSQL
+python scripts/test_pg_connection.py
+
+# Usar DATABASE_URL de render.yaml
+export DATABASE_URL="postgresql://predictfinance_gb6k_user:...@dpg-d5c2tcruibrs73cs32pg-a.ohio-postgres.render.com/predictfinance_gb6k"
+```
+
+---
 ## 📈 Verificar Performance
 
 ```bash

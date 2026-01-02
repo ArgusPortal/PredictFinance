@@ -1,12 +1,85 @@
 # ✅ Ajustes Implementados - Resumo Executivo
 
-**Data**: 20/11/2025  
-**Commit**: `34aff25`  
+**Versão Atual**: 2.1.0  
+**Data Inicial**: 20/11/2025  
+**Última Atualização**: 02/01/2026  
+**Commits**: `34aff25` (nov/2025), `0b9cb43` (jan/2026)  
 **Status**: 🟢 Concluído e testado
 
 ---
 
-## 🎯 Objetivo
+## 🆕 v2.1 - Janeiro 2026 (PostgreSQL + Drift Fixes)
+
+### 🗄️ PostgreSQL Render - Persistência em Produção
+
+**Database**: `predictfinance_gb6k` (Render Free PostgreSQL)  
+**Migração**: Dump do banco anterior (expirado) + restore
+
+**Arquivos Modificados**:
+1. **`render.yaml`**: DATABASE_URL atualizado
+2. **`database/postgres_manager.py`**: Default URL para novo banco
+3. **`api/main.py`**: Endpoint `/debug/database` para diagnóstico
+
+**Benefícios**:
+- ✅ Dados persistem entre deploys (18+ previsões rastreadas)
+- ✅ Queries SQL nativas
+- ✅ Dual persistence: PostgreSQL + JSON backup
+
+### 🔍 Drift Detection Aprimorado
+
+**Problema**: Drift detection preso em cache mode (12 dias desatualizados)
+
+**Causa**: yfinance falhando em produção, sistema usando cache JSON de 21/12/2025
+
+**Solução**: Método hierárquico com API v8 como primário
+
+**Arquivos Modificados**:
+1. **`api/main.py`** (linhas 945-980): Endpoint `/monitoring/drift` refatorado
+   ```python
+   # MÉTODO 1: API v8 (primário)
+   if API_V8_DISPONIVEL:
+       df = coletar_dados_yahoo_v8_custom_range(...)
+   # MÉTODO 2: yfinance (fallback)
+   if df is None or df.empty:
+       df = yf.download(...)
+   # MÉTODO 3: Cache JSON (último recurso)
+   ```
+
+2. **`src/drift_detector.py`** (linhas 227-236): Bug fix numpy.ndarray
+   ```python
+   # ANTES: TypeError ao formatar numpy.ndarray
+   f"{ks_statistic:.4f}"
+   
+   # DEPOIS: Conversão explícita
+   ks_stat_float = float(ks_statistic) if hasattr(...) else float(ks_statistic.item())
+   ```
+
+**Resultado**:
+- ✅ `cache_mode: false` (dados em tempo real)
+- ✅ Drift detectado corretamente (volatilidade -59.9%)
+
+### ⚙️ CI/CD Enhancement
+
+**Arquivo**: `.github/workflows/daily_update_db.yml`
+
+**Mudanças**:
+1. Adicionada dependência `scipy` para drift detection
+2. Execução de `setup_drift_detection.py` após update
+3. Commit automático de `drift_reports.json` e `reference_statistics.json`
+
+**Frequência**: Diário às 4h UTC
+
+### 🐛 Bug Fixes
+
+1. **numpy.ndarray TypeError**: Drift detector KS test (commit 0b9cb43)
+2. **Predictions perdidas**: Queries PostgreSQL corrigidas no endpoint `/monitoring/performance`
+3. **Cache desatualizado**: API v8 implementada no drift endpoint
+
+---
+
+## 🎯 v2.0 - Novembro 2025 (API v8 Integration)
+
+### Objetivo Original
 
 Integrar a API v8 do Yahoo Finance como método primário em todos os módulos do sistema, mantendo compatibilidade total e aumentando confiabilidade.
 
@@ -14,7 +87,114 @@ Integrar a API v8 do Yahoo Finance como método primário em todos os módulos d
 
 ## 📦 Arquivos Modificados
 
-### **1. `database/update_db.py`** (Atualização Diária)
+### **v2.1 - PostgreSQL e Drift (Janeiro 2026)**
+
+#### **1. `render.yaml`**
+```yaml
+# ANTES
+DAT: DATABASE_URL: postgresql://predictfinance:...@dpg-d4o5o4ur433s73enkogg-a
+
+# DEPOIS (v2.1)
+DATA_URL: postgresql://predictfinance_gb6k_user:NVqykY12EDGSl5fOee0MYUc7YaW64wIS@dpg-d5c2tcruibrs73cs32pg-a.ohio-postgres.render.com/predictfinance_gb6k
+```
+
+#### **2. `database/postgres_manager.py`**
+```python
+# ANTES
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://predictfinance:...")
+
+# DEPOIS (v2.1)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://predictfinance_gb6k_user:...@dpg-d5c2tcruibrs73cs32pg-a"
+)
+```
+
+#### **3. `api/main.py` - Drift Endpoint**
+```python
+# ANTES
+@app.get("/monitoring/drift")
+def get_drift():
+    # Apenas yfinance
+    df = yf.download(ticker, ...)
+
+# DEPOIS (v2.1)
+@app.get("/monitoring/drift")
+def get_drift():
+    # Método hierárquico
+    if API_V8_DISPONIVEL:
+        df = coletar_dados_yahoo_v8_custom_range(...)
+    if df is None or df.empty:
+        df = yf.download(...)
+    if df is None or df.empty:
+        df = carregar_dados_cache()
+```
+
+**Benefício**: Drift detection sempre atualizado (não mais cache de 12 dias).
+
+#### **4. `api/main.py` - Debug Endpoint** (NOVO)
+```python
+@app.get("/debug/database")
+def debug_database():
+    # Diagnóstico PostgreSQL
+    return {
+        "postgres_enabled": True,
+        "postgres_predictions": 18,
+        "postgres_metrics": 0,
+        "json_predictions": 18
+    }
+```
+
+#### **5. `src/drift_detector.py`**
+```python
+# ANTES (linhas 227-236)
+statistics.append({
+    "ks_statistic": ks_statistic,  # numpy.ndarray - TypeError!
+    "p_value": p_value
+})
+
+# DEPOIS (v2.1)
+ks_stat_float = float(ks_statistic) if hasattr(ks_statistic, '__float__') else float(ks_statistic.item())
+p_value_float = float(p_value) if hasattr(p_value, '__float__') else float(p_value.item())
+
+statistics.append({
+    "ks_statistic": f"{ks_stat_float:.4f}",
+    "p_value": f"{p_value_float:.4f}"
+})
+```
+
+**Benefício**: KS test não falha mais com TypeError.
+
+#### **6. `.github/workflows/daily_update_db.yml`**
+```yaml
+# ANTES
+steps:
+  - name: Update Database
+    run: python database/update_db.py
+
+# DEPOIS (v2.1)
+steps:
+  - name: Install dependencies
+    run: pip install scipy  # Para drift detection
+    
+  - name: Update Database
+    run: python database/update_db.py
+    
+  - name: Run Drift Detection
+    run: python setup_drift_detection.py
+    
+  - name: Commit drift reports
+    run: |
+      git add monitoring/drift_reports.json
+      git add monitoring/reference_statistics.json
+      git commit -m "chore: update drift reports"
+```
+
+---
+
+### **v2.0 - API v8 Integration (Novembro 2025)**
+
+#### **7. `database/update_db.py`** (Atualização Diária)
 ```python
 # ANTES
 def buscar_dados_yahoo(...):
@@ -367,6 +547,15 @@ metricas = {
 
 ## 🎯 Conclusão
 
+### v2.1 (Janeiro 2026)
+✅ **PostgreSQL Render funcionando** (18+ previsões rastreadas)  
+✅ **Drift detection em tempo real** (API v8 como primário)  
+✅ **Bug fixes críticos** (numpy conversion, predictions queries)  
+✅ **CI/CD com drift automático** (4h UTC diariamente)  
+✅ **Dual persistence** (PostgreSQL + JSON backup)  
+✅ **Debug endpoint** (`/debug/database` para diagnóstico)
+
+### v2.0 (Novembro 2025)
 ✅ **Sistema 100% funcional e testado**  
 ✅ **3 métodos de coleta integrados**  
 ✅ **Confiabilidade 99.9%+**  
@@ -374,12 +563,26 @@ metricas = {
 ✅ **Zero breaking changes**  
 ✅ **Documentação completa**
 
-**O sistema está pronto para produção com máxima confiabilidade!** 🚀
+**O sistema está em produção com máxima confiabilidade e persistência!** 🚀
+
+---
+
+## 📊 Status em Produção (02/01/2026)
+
+- **API**: https://b3sa3-api.onrender.com ✅
+- **Streamlit**: https://predictfinance.streamlit.app ✅
+- **PostgreSQL**: 18 predictions, 0 daily_metrics ✅
+- **Drift Detection**: `cache_mode: false` ✅
+- **Modelo**: R² = 0.7757, MAPE = 2.0% ⚠️ (degradado, precisa retrain)
 
 ---
 
 **Commits Relacionados**:
-- `0a4b2b5` - feat: adicionar solução para erro Yahoo Finance com API v8 direta
-- `34aff25` - refactor: integrar API v8 como método primário em todos os módulos
+- `0a4b2b5` - feat: adicionar solução para erro Yahoo Finance com API v8 direta (nov/2025)
+- `34aff25` - refactor: integrar API v8 como método primário em todos os módulos (nov/2025)
+- `0b9cb43` - fix: numpy.ndarray conversion em drift_detector KS test (jan/2026)
+- `[pending]` - feat: PostgreSQL Render + drift API v8 + dual persistence (jan/2026)
 
-**Total de Linhas Modificadas**: ~250 linhas de código + 1500 linhas de documentação
+**Total de Linhas Modificadas**:
+- v2.0: ~250 linhas de código + 1500 linhas de documentação
+- v2.1: ~180 linhas de código + 14 documentos atualizados

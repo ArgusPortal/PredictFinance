@@ -2,9 +2,20 @@
 
 ## Sistema de Previsão de Preços B3SA3.SA com Deep Learning (LSTM)
 
-**Data do Relatório:** 21 de Dezembro de 2025  
-**Versão do Sistema:** 1.0.0  
-**Status da API:** ✅ Operacional
+**Data do Relatório:** 02 de Janeiro de 2026  
+**Versão do Sistema:** 2.1.0  
+**Status da API:** ✅ Operacional  
+**PostgreSQL Render:** ✅ 18+ previsões rastreadas
+
+---
+
+## 🆕 Atualizações v2.1 (Janeiro 2026)
+
+- 🗄️ **PostgreSQL Render**: Persistência de previsões (18+ registros)
+- 🔍 **Drift Detection API v8**: Método hierárquico com 3 fallbacks
+- 📊 **Dual Persistence**: PostgreSQL + JSON backup
+- 🔧 **Debug Endpoint**: `/debug/database` para diagnóstico
+- ⚠️ **Model Status**: R² = 0.7757, MAPE = 2.0% (re-treino recomendado)
 
 ---
 
@@ -219,7 +230,7 @@ Outliers (> 10%):  ██ 1 previsão (8%)*
 └─────────────────────────────────────────────────────────────┘
                             ↓ (se falhar)
 ┌─────────────────────────────────────────────────────────────┐
-│  NÍVEL 2: PostgreSQL                               │
+│  NÍVEL 2: PostgreSQL                                        │
 │  ├── 6 anos de histórico (2020-2025)                        │
 │  └── Atualização diária via GitHub Actions                  │
 └─────────────────────────────────────────────────────────────┘

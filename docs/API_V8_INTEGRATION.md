@@ -1,12 +1,61 @@
 # Integração API v8 no Endpoint de Predição
 
 **Data:** 2025-01-28  
-**Módulo:** `api/data_fetcher.py`  
+**Última Atualização:** 02/01/2026 (v2.1 - Drift Detection)  
+**Módulo:** `api/data_fetcher.py`, `api/main.py` (drift endpoint)  
 **Status:** ✅ **IMPLEMENTADO E TESTADO**
 
 ---
 
-## 📋 Resumo
+## 🆕 v2.1: API v8 no Drift Detection (Janeiro 2026)
+
+**Módulo:** `api/main.py` - endpoint `/monitoring/drift`  
+**Commit:** 0b9cb43 (02/01/2026)
+
+### Implementação Hierárquica
+
+```python
+# api/main.py - drift endpoint (linhas 945-980)
+# MÉTODO 1: API v8 (mais confiável em produção)
+if API_V8_DISPONIVEL:
+    from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
+    df = coletar_dados_yahoo_v8_custom_range(...)
+    
+# MÉTODO 2: yfinance (fallback)
+if df is None or df.empty:
+    df = yf.download(ticker, start=start_date, end=end_date)
+    
+# MÉTODO 3: Cache JSON (último recurso)
+if df is None or df.empty:
+    df = carregar_dados_cache()
+```
+
+### Benefícios em Produção
+
+✅ **Confiabilidade:** API v8 não sofre rate limits do yfinance  
+✅ **Drift Accuracy:** Dados sempre atualizados (não cache de 12 dias)  
+✅ **Bug Fix:** Conversão `numpy.ndarray` → `float` no KS test  
+✅ **CI/CD:** Execução diária via `daily_update_db.yml` (4h UTC)
+
+### Verificação
+
+```bash
+curl https://b3sa3-api.onrender.com/monitoring/drift
+```
+
+**Resposta esperada:**
+```json
+{
+  "drift_detected": true,
+  "cache_mode": false,  // ✅ API v8 funcionando
+  "data_source": "yahoo_v8",
+  "alerts": ["Volatilidade diminuiu 59.9%"]
+}
+```
+
+---
+
+## 📋 Resumo (Endpoint de Predição)
 
 Refatorada função `buscar_dados_historicos()` para usar **estratégia em cascata**, priorizando **demonstração de funcionalidade real** com APIs externas.
 

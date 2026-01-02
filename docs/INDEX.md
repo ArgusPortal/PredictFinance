@@ -1,8 +1,15 @@
 # 📚 Índice de Documentação - PredictFinance
 
-## Guias de Execução das Fases
+**Versão:** 2.1.0  
+**Última atualização:** 02/01/2026
 
-Este diretório contém a documentação completa do projeto **PredictFinance**, incluindo guias detalhados para execução de cada fase, especificações técnicas e instruções de deployment.
+## 🆕 Novidades v2.1 (Janeiro 2026)
+
+- 🗄️ **PostgreSQL Render**: Persistência em produção (18+ registros)
+- 🔍 **Drift Detection API v8**: Método hierárquico com 3 fallbacks
+- 📊 **Dual Persistence**: PostgreSQL + JSON backup
+- 📄 **CHANGELOG_V2.1.md**: Novo documento com todas as mudanças
+- 🔧 **DATABASE_GUIDE.md**: Guia completo de PostgreSQL
 
 ---
 
@@ -180,7 +187,7 @@ Este diretório contém a documentação completa do projeto **PredictFinance**,
 - Uptime monitoring 24/7
 - Automação completa via scripts diários
 
----### ⏳ Fase 8: Monitoramento e Finalização
+### ⏳ Fase 8: Monitoramento e Finalização
 **Status**: Pendente
 
 **Objetivo**:
@@ -260,9 +267,19 @@ docs/
 ├── FASE_3_GUIA.md                    ✅ Guia da Fase 3
 ├── FASE_4_GUIA.md                    ✅ Guia da Fase 4
 ├── FASE_5_GUIA.md                    ✅ Guia da Fase 5
-├── DOCUMENTACAO_TECNICA.md            ✅ Documentação técnica completa pós-implementação
-├── RESUMO_PROJETO.md                 ✅ Resumo executivo
+├── FASE_6_GUIA.md                    ✅ Guia da Fase 6 (API)
+├── FASE_7_GUIA.md                    ✅ Guia da Fase 7 (Deploy)
+├── FASE_8_GUIA.md                    ✅ Guia da Fase 8 (Monitoramento) - v2.1
+├── FASE_8_RESUMO.md                  ✅ Resumo da Fase 8 - v2.1
+├── DOCUMENTACAO_TECNICA.md            ✅ Documentação técnica - v2.1.0
+├── RESUMO_PROJETO.md                 ✅ Resumo executivo - v2.1
 ├── INSTRUCOES_EXECUCAO.md            ✅ Setup e comandos
+├── CHANGELOG_V2.1.md                 🆕 Mudanças v2.1 (Janeiro 2026)
+├── DATABASE_GUIDE.md                 🆕 Guia PostgreSQL Render
+├── API_V8_INTEGRATION.md             ✅ Integração API v8 - v2.1
+├── MONITORING_SYSTEM.md              ✅ Sistema de monitoramento - v2.1
+├── MONITORING_QUICKSTART.md          ✅ Quick start - v2.1
+├── ARQUITETURA_MONITORAMENTO.md      ✅ Arquitetura - v2.1
 ├── INDEX.md                          ✅ Este arquivo
 │
 ├── data_collection/                  📊 Logs e gráficos da Fase 1

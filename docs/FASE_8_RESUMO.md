@@ -3,7 +3,18 @@
 ## ✅ Status: IMPLEMENTADA
 
 **Data**: Novembro 2025  
+**Última Atualização:** 02/01/2026 (v2.1)  
 **Progresso**: 100% (Fase Final do Projeto!)
+
+---
+
+## 🆕 Novidades v2.1 (Janeiro 2026)
+
+- 🗄️ **PostgreSQL Render**: Persistência de previsões (18+ registros)  
+- 🔍 **Drift Detection API v8**: Método hierárquico com 3 fallbacks  
+- 📊 **Dual Persistence**: PostgreSQL (produção) + JSON (backup)  
+- ⚙️ **CI/CD**: Drift detection diário via GitHub Actions  
+- 🐛 **Bug Fixes**: numpy.ndarray conversion em drift_detector.py
 
 ---
 
@@ -19,7 +30,27 @@ A **Fase 8** implementou um sistema **completo de monitoramento** para o modelo 
 
 ---
 
-## 🗂️ Arquivos Criados (10 arquivos)
+## 🗂️ Arquivos Criados (13 arquivos - v2.1: +3)
+
+### 0. Sistema de Persistência (🆕 v2.1)
+```
+database/postgres_manager.py         # 250 linhas
+├── PostgresManager                  # Conexão Render PostgreSQL
+├── save_prediction()                # Salva no PostgreSQL
+├── get_predictions()                # Recupera previsões
+└── get_daily_metrics()              # Métricas agregadas
+
+database/db_manager.py               # 180 linhas
+├── DBManager                        # Dual persistence
+├── save_to_postgres()               # PostgreSQL first
+└── save_to_json()                   # JSON backup
+```
+
+**Funcionalidades v2.1:**
+- Persistência PostgreSQL (18+ previsões rastreadas)
+- Backup automático em JSON
+- Endpoint `/debug/database` para diagnóstico
+- Schema com predictions + daily_metrics
 
 ### 1. Sistema de Logging
 ```

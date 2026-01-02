@@ -1,17 +1,30 @@
-# 📊 Guia do Sistema de Banco de Dados SQLite
+# 📊 Guia do Sistema de Banco de Dados
 
 ## Visão Geral
 
-O sistema utiliza SQLite como cache local de dados históricos OHLCV (Open, High, Low, Close, Volume) para solucionar o problema de bloqueio do Yahoo Finance em ambientes de produção.
+O projeto utiliza **dois sistemas de banco de dados** complementares:
+
+### 1. SQLite - Cache Local de Dados Históricos (OHLCV)
+- **Propósito**: Cache de dados históricos do mercado
+- **Uso**: Fallback quando Yahoo Finance falha
+- **Tamanho**: ~500 KB para 5 anos de dados
+- **Localização**: `database/market_data.db`
+
+### 2. PostgreSQL - Persistência em Produção (Render)
+- **Propósito**: Armazenamento de previsões e métricas de produção
+- **Uso**: Sistema principal para tracking de previsões
+- **URL**: Configurada via `DATABASE_URL` no render.yaml
+- **Tabelas**: `predictions`, `daily_metrics`
 
 ### Problema Resolvido
 
 **Situação**: Yahoo Finance bloqueia requisições de IPs compartilhados (Render, Vercel, etc.) com erros 429 e "No timezone found".
 
-**Solução**: Sistema de fallback em 3 níveis:
-1. 🌐 **Yahoo Finance** (tentativa com retry)
-2. 💾 **SQLite Cache** (fallback primário - NOVO)
-3. 📦 **Dados Hardcoded** (último recurso - 60 dias de B3SA3.SA)
+**Solução**: Sistema de fallback multinível:
+1. 🌐 **Yahoo Finance API v8** (método primário - mais confiável)
+2. 📦 **yfinance** (biblioteca oficial)
+3. 💾 **SQLite Cache** (fallback offline - 6 anos de histórico)
+4. 📋 **Cache JSON** (último recurso)
 
 ## Arquitetura
 
@@ -35,6 +48,8 @@ PredictFinance/
 
 ## Schema do Banco de Dados
 
+### SQLite - market_data.db
+
 ```sql
 CREATE TABLE IF NOT EXISTS stock_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,12 +68,78 @@ CREATE INDEX idx_ticker_date ON stock_data(ticker, date DESC);
 CREATE INDEX idx_ticker ON stock_data(ticker);
 ```
 
+### PostgreSQL - Render (Produção)
+
+```sql
+CREATE TABLE IF NOT EXISTS predictions (
+    id SERIAL PRIMARY KEY,
+    request_id VARCHAR(50) UNIQUE NOT NULL,
+    ticker VARCHAR(20) NOT NULL,
+    timestamp TIMESTAMP NOT NULL,
+    predicted_value DECIMAL(10, 2) NOT NULL,
+    actual_value DECIMAL(10, 2),
+    error DECIMAL(10, 4),
+    error_pct DECIMAL(10, 4),
+    validated BOOLEAN DEFAULT FALSE,
+    validation_date TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS daily_metrics (
+    id SERIAL PRIMARY KEY,
+    ticker VARCHAR(20) NOT NULL,
+    date DATE NOT NULL,
+    mae DECIMAL(10, 4),
+    mape DECIMAL(10, 4),
+    rmse DECIMAL(10, 4),
+    predictions_validated INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(ticker, date)
+);
+
+CREATE INDEX idx_predictions_ticker ON predictions(ticker);
+CREATE INDEX idx_predictions_validated ON predictions(validated);
+CREATE INDEX idx_predictions_timestamp ON predictions(timestamp DESC);
+```
+
 ### Características
 
+**SQLite:**
 - **Tamanho**: ~500 KB para 5 anos de dados de um ticker
 - **Performance**: Indexes em ticker + date para queries rápidas
 - **Integridade**: UNIQUE constraint previne duplicatas
 - **Auditoria**: Campo created_at para rastreamento
+
+**PostgreSQL:**
+- **Persistência**: Dados preservados entre deploys no Render
+- **Performance**: Indexes otimizados para queries de monitoramento
+- **Integridade**: Constraints e validação de dados
+- **Concorrência**: Suporta múltiplas conexões simultâneas
+
+## Configuração
+
+### PostgreSQL (Render)
+
+O banco PostgreSQL é configurado via variável de ambiente no `render.yaml`:
+
+```yaml
+envVars:
+  - key: DATABASE_URL
+    value: postgresql://USER:PASSWORD@HOST/DATABASE
+```
+
+**Atual**: `predictfinance_gb6k` (criado em 02/01/2026)
+
+**Inicialização Automática:**
+- O `database/db_manager.py` detecta `DATABASE_URL`
+- Cria tabelas automaticamente se não existirem
+- `db_manager.pg_enabled = True` quando PostgreSQL disponível
+
+**Verificação:**
+```bash
+# Endpoint de diagnóstico
+curl "https://b3sa3-api.onrender.com/debug/database"
+```
 
 ## Uso Básico
 

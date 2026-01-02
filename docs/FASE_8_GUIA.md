@@ -4,8 +4,40 @@
 **Projeto**: PredictFinance - Sistema de Previsão B3SA3.SA  
 **Fase**: 8/8 - **FASE FINAL**  
 **Status**: ✅ Implementada  
+**Versão:** 2.1.0  
 **Data**: Novembro 2025  
-**Última atualização:** 21/12/2025 (Drift Detection - Janela Deslizante)
+**Última atualização:** 02/01/2026 (PostgreSQL + Drift Detection API v8)
+
+---
+
+## 🆕 Novidades v2.1 (Janeiro 2026)
+
+### 🗄️ PostgreSQL Render - Persistência em Produção
+
+**Database:** `predictfinance_gb6k` (Render Free PostgreSQL)  
+**URL:** `postgresql://predictfinance_gb6k_user:...@dpg-d5c2tcruibrs73cs32pg-a.ohio-postgres.render.com/predictfinance_gb6k`  
+**Configuração:** `render.yaml` e `database/postgres_manager.py`
+
+**Tabelas:**
+- `predictions`: 18+ registros (id, request_id, ticker, timestamp, predicted, actual, error_pct, validated)
+- `daily_metrics`: Métricas diárias agregadas (mae, mape, rmse, total_validated)
+
+**Vantagens:**
+- ✅ Dados sobrevivem a deploys do Render
+- ✅ Queries SQL nativas para filtragem e agregação
+- ✅ Backup automático em JSON (dual persistence)
+- ✅ Endpoint `/debug/database` para diagnóstico
+
+### 🔍 Drift Detection Aprimorado
+
+**Método Hierárquico (3 níveis):**
+1. **Yahoo Finance API v8** (primário) - `src/yahoo_finance_v8.py`
+2. **yfinance** (fallback) - `yf.download(...)`
+3. **Cache JSON** (último recurso) - `data/cache/latest_data.json`
+
+**Bug Fix:** Conversão `numpy.ndarray` → `float` no KS test (`drift_detector.py` linhas 227-236)
+
+**CI/CD:** Execução diária de drift detection (4h UTC) via `daily_update_db.yml`
 
 ---
 
@@ -89,13 +121,18 @@ yfinance==0.2.36       # Dados em produção
 
 ## 🧩 Componentes do Sistema
 
-O sistema de monitoramento é composto por **5 módulos**:
+O sistema de monitoramento é composto por **6 módulos** (v2.1: +PostgreSQL):
 
 ```
 PredictFinance/
 │
 ├── api/
 │   └── monitoring.py               # Logging de requisições
+│
+├── database/                       # 🆕 v2.1
+│   ├── postgres_manager.py         # PostgreSQL Render
+│   ├── db_manager.py               # Dual persistence
+│   └── supabase_manager.py         # Supabase (legado)
 │
 ├── src/
 │   ├── performance_monitor.py      # Monitor de performance

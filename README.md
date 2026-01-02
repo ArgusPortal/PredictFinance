@@ -7,15 +7,20 @@
 
 Este projeto desenvolve um modelo preditivo de preços das ações da B3 S.A. (código **B3SA3.SA**) utilizando redes neurais **LSTM (Long Short-Term Memory)**. O objetivo principal é prever o **preço de fechamento diário** da ação, métrica que reflete o consenso de valor ao final de cada pregão.
 
-O projeto contempla desde a coleta e preparação de dados históricos até o deploy de uma API REST para disponibilizar previsões em tempo real, incluindo monitoramento contínuo do modelo em produção.
+O projeto contempla desde a coleta e preparação de dados históricos até o deploy de uma API REST para disponibilizar previsões em tempo real, incluindo:
+- 🔄 **Re-treino semanal automático** (GitHub Actions)
+- 📊 **Monitoramento contínuo** com drift detection (janela deslizante)
+- 🗄️ **Persistência em PostgreSQL** (Render) para previsões e métricas
+- 🎯 **Validação automática** de previsões contra valores reais do mercado
 
 **✨ Novidades v2.0:**
 - 💾 **Cache SQLite**: 6 anos de histórico (2020-2025) com fallback automático
-- 🚀 **API FastAPI**: Busca automática de dados com sistema de 3 níveis (Yahoo → SQLite → Hardcoded)
+- �️ **PostgreSQL Render**: Persistência em nuvem para previsões e métricas de produção
+- 🚀 **API FastAPI**: Busca automática de dados com sistema multi-nível (Yahoo Finance API v8 → yfinance → SQLite → Cache)
 - 🎨 **Interface Streamlit**: Dashboards interativos com análise descritiva e técnica
-- 🔄 **Atualização Automática**: GitHub Actions atualiza banco diariamente às 4h UTC
-- 📊 **Novo Endpoint**: `/data/historical` para consultas customizadas de período
-- 🔍 **Monitoramento de Performance**: Sistema completo de validação de previsões em produção
+- 🔄 **Atualização Automática**: GitHub Actions atualiza banco e drift diariamente às 4h UTC
+- 📊 **Endpoints Completos**: `/data/historical`, `/monitoring/performance`, `/monitoring/drift`, `/debug/database`
+- 🔍 **Monitoramento de Performance**: Sistema completo de validação de previsões em produção com PostgreSQL
 
 ---
 
@@ -85,14 +90,17 @@ curl "https://b3sa3-api.onrender.com/data/historical/B3SA3.SA?start_date=2024-01
 #### Monitoramento de Performance
 
 ```bash
-# Consultar métricas de performance em produção
+# Consultar métricas de performance em produção (PostgreSQL)
 curl "https://b3sa3-api.onrender.com/monitoring/performance"
 
 # Validar previsões pendentes
 curl -X POST "https://b3sa3-api.onrender.com/monitoring/validate?days_back=7"
 
-# Verificar drift detection (janela deslizante)
+# Verificar drift detection (janela deslizante com API v8)
 curl "https://b3sa3-api.onrender.com/monitoring/drift"
+
+# Diagnóstico do banco de dados
+curl "https://b3sa3-api.onrender.com/debug/database"
 ```
 
 **Resposta:**

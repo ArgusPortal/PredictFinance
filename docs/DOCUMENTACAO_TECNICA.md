@@ -7,9 +7,9 @@
 ---
 
 **Projeto**: PredictFinance  
-**Versão**: 1.0.0  
-**Data**: 02 de Novembro de 2025  
-**Atualização**: 21 de Dezembro de 2025  
+**Versão**: 2.1.0  
+**Data Inicial**: 02 de Novembro de 2025  
+**Última Atualização**: 02 de Janeiro de 2026  
 **Repositório**: [github.com/ArgusPortal/PredictFinance](https://github.com/ArgusPortal/PredictFinance)  
 **API em Produção**: [https://b3sa3-api.onrender.com](https://b3sa3-api.onrender.com)
 

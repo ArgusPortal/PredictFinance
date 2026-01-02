@@ -1,5 +1,7 @@
 # 🔄 Sistema de Re-treino Automático
 
+**Última atualização:** 02/01/2026 (v2.1)
+
 ## 📋 Visão Geral
 
 Sistema automatizado que mantém o modelo LSTM sempre atualizado através de re-treino semanal via **GitHub Actions**.
@@ -9,6 +11,14 @@ Sistema automatizado que mantém o modelo LSTM sempre atualizado através de re-
 - 📉 **Data Drift**: Mercado muda, modelo envelhece
 - 🎯 **Precisão**: Dados recentes melhoram previsões
 - 🤖 **Automação**: Sem intervenção manual necessária
+
+### ⚠️ Status Atual (v2.1)
+
+**Model Degradation Detectado:**
+- **Baseline (Fase 4):** R² = 0.935, MAPE = 1.53%
+- **Atual (v2.1):** R² = 0.7757, MAPE = 2.0%
+
+**Recomendação:** Executar re-treino manual para investigar degradação (possível causa: dados Yahoo Finance API v8 diferentes do treinamento original)
 
 ---
 
