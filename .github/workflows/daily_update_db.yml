@@ -37,7 +37,7 @@ jobs:
     - name: Instalar dependências
       run: |
         python -m pip install --upgrade pip
-        pip install yfinance pandas
+        pip install yfinance pandas requests scipy
     
     - name: Verificar se banco de dados existe
       run: |
@@ -64,13 +64,18 @@ jobs:
     - name: Verificar mudanças
       id: check_changes
       run: |
-        if git diff --quiet database/market_data.db; then
-          echo "Nenhuma mudança no banco de dados"
+        if git diff --quiet database/market_data.db monitoring/drift_reports.json 2>/dev/null; then
+          echo "Nenhuma mudança detectada"
           echo "has_changes=false" >> $GITHUB_OUTPUT
         else
-          echo "Banco de dados foi atualizado"
+          echo "Arquivos foram atualizados"
           echo "has_changes=true" >> $GITHUB_OUTPUT
         fi
+    
+    - name: Atualizar análise de drift
+      run: |
+        echo "🔍 Executando análise de drift..."
+        python setup_drift_detection.py || echo "⚠️ Drift detection falhou, continuando..."
     
     - name: Commit e push das mudanças
       if: steps.check_changes.outputs.has_changes == 'true'
@@ -78,7 +83,8 @@ jobs:
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         git add database/market_data.db
-        git commit -m "chore: atualização diária do banco de dados [skip ci]"
+        git add monitoring/drift_reports.json monitoring/reference_statistics.json 2>/dev/null || true
+        git commit -m "chore: atualização diária - banco e drift [skip ci]"
         git push
     
     - name: Notificar sucesso
