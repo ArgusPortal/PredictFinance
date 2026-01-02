@@ -935,14 +935,45 @@ async def get_drift_status() -> Dict[str, Any]:
     import yfinance as yf
     from datetime import timedelta
     
+    # Tentar importar API v8 (mais confiável)
     try:
-        # Busca dados recentes do Yahoo Finance
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=90)
+        from src.yahoo_finance_v8 import coletar_dados_yahoo_v8_custom_range
+        API_V8_DISPONIVEL = True
+    except ImportError:
+        API_V8_DISPONIVEL = False
+    
+    df = None
+    
+    try:
+        # MÉTODO 1: API v8 (mais confiável)
+        if API_V8_DISPONIVEL:
+            try:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=90)
+                df = coletar_dados_yahoo_v8_custom_range(
+                    "B3SA3.SA",
+                    start_date.strftime("%Y-%m-%d"),
+                    end_date.strftime("%Y-%m-%d")
+                )
+                if df is not None and not df.empty:
+                    print("✅ Drift: Dados obtidos via API v8")
+            except Exception as e:
+                print(f"⚠️ API v8 falhou: {e}")
+                df = None
         
-        df = yf.download("B3SA3.SA", start=start_date, end=end_date, progress=False)
+        # MÉTODO 2: yfinance (fallback)
+        if df is None or df.empty:
+            try:
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=90)
+                df = yf.download("B3SA3.SA", start=start_date, end=end_date, progress=False)
+                if df is not None and not df.empty:
+                    print("✅ Drift: Dados obtidos via yfinance")
+            except Exception as e:
+                print(f"⚠️ yfinance falhou: {e}")
+                df = None
         
-        if df.empty:
+        if df is None or df.empty:
             # Fallback: tentar usar dados do arquivo drift_reports.json se existir
             reports_path = ROOT_DIR / "monitoring" / "drift_reports.json"
             if reports_path.exists():

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # URL de conexão do PostgreSQL (Render)
 DATABASE_URL = os.getenv(
     'DATABASE_URL',
-    'postgresql://predictfinance_user:1V7ZFkk17XF1EWeSP8osSJVqpvlqygGE@dpg-d4o5o4ur433s73enkogg-a.ohio-postgres.render.com/predictfinance'
+    'postgresql://predictfinance_gb6k_user:NVqykY12EDGSl5fOee0MYUc7YaW64wIS@dpg-d5c2tcruibrs73cs32pg-a.ohio-postgres.render.com/predictfinance_gb6k'
 )
 
 # Tentar importar psycopg2
