@@ -165,6 +165,58 @@
         "mean_threshold_pct": 5.0,
         "std_threshold_pct": 50.0
       }
+    },
+    {
+      "timestamp": "2026-01-02T18:08:32.045452",
+      "approach": "sliding_window",
+      "drift_detected": true,
+      "severity": "medium",
+      "alerts": [
+        "Volatilidade diminuiu 62.4%",
+        "Distribuição diferente (KS p=0.0031)"
+      ],
+      "current_window": {
+        "period": "19/12 a 02/01",
+        "days": 7,
+        "stats": {
+          "n_samples": 7,
+          "mean": 13.242276464189802,
+          "std": 0.21215135068285218,
+          "min": 12.877333641052246,
+          "max": 13.509530067443848,
+          "median": 13.344186782836914,
+          "q1": 13.091308116912842,
+          "q3": 13.391134262084961,
+          "iqr": 0.29982614517211914
+        }
+      },
+      "reference_window": {
+        "period": "06/11 a 18/12",
+        "days": 30,
+        "stats": {
+          "n_samples": 30,
+          "mean": 13.748143005371094,
+          "std": 0.5649324912134931,
+          "min": 12.624455451965332,
+          "max": 14.686386108398438,
+          "median": 13.776997089385986,
+          "q1": 13.48035192489624,
+          "q3": 14.0663480758667,
+          "iqr": 0.585996150970459
+        }
+      },
+      "comparisons": {
+        "mean_diff_pct": 3.679526325727496,
+        "std_diff_pct": 62.446601322727204,
+        "ks_test": {
+          "statistic": 0.7,
+          "p_value": 0.00314429489002544
+        }
+      },
+      "thresholds": {
+        "mean_threshold_pct": 5.0,
+        "std_threshold_pct": 50.0
+      }
     }
   ]
 }

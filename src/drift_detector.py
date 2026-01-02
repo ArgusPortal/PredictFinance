@@ -226,14 +226,17 @@ class SlidingWindowDriftDetector:
         ks_result = None
         if len(current_data) >= 5 and len(reference_data) >= 20:
             ks_statistic, p_value = stats.ks_2samp(reference_data, current_data)
-            ks_result = {"statistic": float(ks_statistic), "p_value": float(p_value)}
+            # Garantir que são floats (podem vir como numpy arrays)
+            ks_stat_float = float(ks_statistic) if hasattr(ks_statistic, '__float__') else float(ks_statistic.item()) if hasattr(ks_statistic, 'item') else float(ks_statistic)
+            p_value_float = float(p_value) if hasattr(p_value, '__float__') else float(p_value.item()) if hasattr(p_value, 'item') else float(p_value)
+            ks_result = {"statistic": ks_stat_float, "p_value": p_value_float}
             
-            if p_value < self.significance_level:
+            if p_value_float < self.significance_level:
                 # Não marcar como drift apenas pelo KS em janelas pequenas
                 # pois pode haver falsos positivos
                 if mean_diff_pct > 3 or std_diff_pct > 30:
                     drift_detected = True
-                    alerts.append(f"Distribuição diferente (KS p={p_value:.4f})")
+                    alerts.append(f"Distribuição diferente (KS p={p_value_float:.4f})")
         
         # Período atual e referência
         if hasattr(df.index[-1], 'strftime'):
