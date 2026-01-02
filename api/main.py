@@ -199,6 +199,54 @@ async def health() -> HealthResponse:
 
 
 @app.get(
+    "/debug/database",
+    summary="Diagnóstico do Banco de Dados",
+    description="Verifica status da conexão com PostgreSQL e SQLite",
+    tags=["Debug"]
+)
+async def debug_database() -> Dict[str, Any]:
+    """
+    Endpoint de diagnóstico para verificar conexão com bancos de dados.
+    """
+    import os
+    result = {
+        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "database_url_prefix": os.getenv("DATABASE_URL", "")[:50] + "..." if os.getenv("DATABASE_URL") else None,
+        "postgres_enabled": False,
+        "postgres_predictions": 0,
+        "sqlite_enabled": True,
+        "sqlite_predictions": 0
+    }
+    
+    # Verificar PostgreSQL
+    try:
+        import psycopg2
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            conn = psycopg2.connect(db_url)
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM predictions")
+            count = cur.fetchone()[0]
+            conn.close()
+            result["postgres_enabled"] = True
+            result["postgres_predictions"] = count
+    except Exception as e:
+        result["postgres_error"] = str(e)
+    
+    # Verificar SQLite
+    try:
+        from database.db_manager import get_db
+        db = get_db()
+        preds = db.get_predictions(ticker="B3SA3.SA", limit=500)
+        result["sqlite_predictions"] = len(preds) if preds else 0
+        result["db_manager_pg_enabled"] = getattr(db, 'pg_enabled', False)
+    except Exception as e:
+        result["sqlite_error"] = str(e)
+    
+    return result
+
+
+@app.get(
     "/info",
     response_model=InfoModeloResponse,
     summary="Informações do Modelo",
